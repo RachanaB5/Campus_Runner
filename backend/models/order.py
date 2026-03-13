@@ -23,7 +23,7 @@ class Order(db.Model):
     items = db.relationship('OrderItem', backref='order', cascade='all, delete-orphan')
     delivery = db.relationship('Delivery', backref='order', uselist=False)
     
-    def to_dict(self, include_items=True):
+    def to_dict(self, include_items=True, include_delivery=True):
         order_dict = {
             'id': self.id,
             'customer_id': self.customer_id,
@@ -41,6 +41,8 @@ class Order(db.Model):
         }
         if include_items and self.items:
             order_dict['items'] = [item.to_dict() for item in self.items]
+        if include_delivery and self.delivery:
+            order_dict['delivery'] = self.delivery.to_dict()
         return order_dict
 
 class OrderItem(db.Model):

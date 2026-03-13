@@ -2,26 +2,33 @@ from flask_mail import Message
 from threading import Thread
 from datetime import datetime
 import os
+import traceback
 
-def send_async_email(app, msg):
-    """Send email asynchronously"""
-    try:
-        with app.app_context():
-            from flask import current_app
-            if 'mail' in current_app.extensions:
-                current_app.extensions['mail'].send(msg)
-                print(f"✓ Email sent to {msg.recipients}")
-    except Exception as e:
-        print(f"⚠️ Error sending email: {str(e)}")
+def send_email_in_background(app, subject, recipients, html):
+    """Send email in background thread with proper app context"""
+    def send_email():
+        try:
+            with app.app_context():
+                from flask_mail import Mail
+                mail = Mail(app)
+                msg = Message(subject=subject, recipients=recipients, html=html)
+                mail.send(msg)
+                print(f"✓ Email successfully sent to {recipients}")
+        except Exception as e:
+            print(f"⚠️ Error sending email: {str(e)}")
+            print(f"📍 Traceback: {traceback.format_exc()}")
+    
+    thread = Thread(target=send_email)
+    thread.daemon = True
+    thread.start()
 
 def send_order_confirmation_email(user_email, user_name, order_number, order_details, total_amount, estimated_delivery_time, app=None):
     """Send order confirmation email"""
     try:
+        print(f"\n📧 Attempting to send order confirmation email to {user_email}")
         if app is None:
             from app import app as flask_app
             app = flask_app
-            
-        subject = f"Order Confirmation #{order_number} - Campus Runner"
         
         # Build email body
         items_html = ""
@@ -109,18 +116,17 @@ def send_order_confirmation_email(user_email, user_name, order_number, order_det
         </html>
         """
         
-        msg = Message(
-            subject=subject,
-            recipients=[user_email],
-            html=html
-        )
+        # Create message
+        subject = f"Order Confirmation #{order_number} - Campus Runner"
         
         # Send email asynchronously
-        Thread(target=send_async_email, args=(app, msg)).start()
+        print(f"✓ Order confirmation email queued for {user_email}")
+        send_email_in_background(app, subject, [user_email], html)
         return True
         
     except Exception as e:
-        print(f"Error sending email: {str(e)}")
+        print(f"❌ Error creating confirmation email: {str(e)}")
+        print(f"📍 Traceback: {traceback.format_exc()}")
         return False
 
 def send_order_ready_notification(user_email, user_name, order_number, app=None):
@@ -241,13 +247,7 @@ def send_welcome_email(user_email, user_name, app=None):
         </html>
         """
         
-        msg = Message(
-            subject="Welcome to Campus Runner! 🎉",
-            recipients=[user_email],
-            html=html
-        )
-        
-        Thread(target=send_async_email, args=(app, msg)).start()
+        send_email_in_background(app, "Welcome to Campus Runner! 🎉", [user_email], html)
         return True
         
     except Exception as e:
@@ -257,11 +257,13 @@ def send_welcome_email(user_email, user_name, app=None):
 def send_admin_order_notification(order_number, customer_name, customer_email, customer_phone, delivery_address, order_details, total_amount, app=None):
     """Send order notification to admin"""
     try:
+        print(f"\n📧 Attempting to send admin notification for order {order_number}")
         if app is None:
             from app import app as flask_app
             app = flask_app
         
         admin_email = os.getenv('ADMIN_EMAIL', 'campusrunnerrvu@gmail.com')
+        print(f"📬 Admin email target: {admin_email}")
         
         # Build items HTML
         items_html = ""
@@ -345,15 +347,11 @@ def send_admin_order_notification(order_number, customer_name, customer_email, c
         </html>
         """
         
-        msg = Message(
-            subject=f"🔔 NEW ORDER #{order_number} from Campus Runner",
-            recipients=[admin_email],
-            html=html
-        )
-        
-        Thread(target=send_async_email, args=(app, msg)).start()
+        print(f"✓ Admin notification queued for {admin_email}")
+        send_email_in_background(app, f"🔔 NEW ORDER #{order_number} from Campus Runner", [admin_email], html)
         return True
         
     except Exception as e:
-        print(f"Error in send_admin_order_notification: {str(e)}")
+        print(f"❌ Error in send_admin_order_notification: {str(e)}")
+        print(f"📍 Traceback: {traceback.format_exc()}")
         return False

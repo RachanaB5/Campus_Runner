@@ -9,6 +9,7 @@ import { Rewards } from "./pages/Rewards";
 import { Profile } from "./pages/Profile";
 import { Orders } from "./pages/Orders";
 import { Payment } from "./pages/Payment";
+import { Admin } from "./pages/Admin";
 
 export const router = createBrowserRouter([
   {
@@ -24,6 +25,7 @@ export const router = createBrowserRouter([
       { path: "profile", Component: Profile },
       { path: "orders", Component: Orders },
       { path: "payment", Component: Payment },
+      { path: "admin", Component: Admin },
     ],
   },
 ]);

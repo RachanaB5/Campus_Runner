@@ -16,6 +16,29 @@ def get_all_foods():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@menu_bp.route('/search', methods=['GET'])
+def search_foods():
+    """Search foods by name or category"""
+    try:
+        query = request.args.get('q', '').lower()
+        if not query:
+            return jsonify({'foods': []}), 200
+        
+        # Search by name or category
+        foods = Food.query.filter(
+            db.or_(
+                Food.name.ilike(f'%{query}%'),
+                Food.category.ilike(f'%{query}%'),
+                Food.description.ilike(f'%{query}%')
+            )
+        ).all()
+        
+        return jsonify({
+            'foods': [food.to_dict() for food in foods]
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @menu_bp.route('/category/<category>', methods=['GET'])
 def get_foods_by_category(category):
     """Get foods by category"""
@@ -60,7 +83,9 @@ def add_food():
             category=data.get('category'),
             image_url=data.get('image_url'),
             prep_time=data.get('prep_time'),
-            available=data.get('available', True)
+            available=data.get('available', True),
+            is_veg=data.get('is_veg', True),
+            rating=data.get('rating', 4.5)
         )
         
         db.session.add(food)
@@ -75,7 +100,7 @@ def add_food():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-@menu_bp.route('/<food_id>', methods=['PUT'])
+@menu_bp.route('/items/<food_id>', methods=['PUT'])
 @jwt_required()
 def update_food(food_id):
     """Update food item (admin only)"""
@@ -107,6 +132,10 @@ def update_food(food_id):
             food.prep_time = data['prep_time']
         if 'available' in data:
             food.available = data['available']
+        if 'is_veg' in data:
+            food.is_veg = data['is_veg']
+        if 'rating' in data:
+            food.rating = data['rating']
         
         db.session.commit()
         
@@ -119,7 +148,7 @@ def update_food(food_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-@menu_bp.route('/<food_id>', methods=['DELETE'])
+@menu_bp.route('/items/<food_id>', methods=['DELETE'])
 @jwt_required()
 def delete_food(food_id):
     """Delete food item (admin only)"""

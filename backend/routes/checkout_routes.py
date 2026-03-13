@@ -221,6 +221,9 @@ def confirm_checkout():
         
         # Send confirmation emails (non-blocking)
         try:
+            # Import the actual Flask app, not current_app (current_app loses context in threads)
+            from app import app as flask_app
+            
             # Send order confirmation to user
             send_order_confirmation_email(
                 user_email=user.email,
@@ -229,7 +232,7 @@ def confirm_checkout():
                 order_details=order.to_dict(),
                 total_amount=order.total_amount,
                 estimated_delivery_time=order.estimated_delivery_time.strftime('%I:%M %p') if order.estimated_delivery_time else 'N/A',
-                app=current_app
+                app=flask_app
             )
             
             # Send order notification to admin
@@ -242,7 +245,7 @@ def confirm_checkout():
                 delivery_address=checkout.delivery_address,
                 order_details=order.to_dict(),
                 total_amount=order.total_amount,
-                app=current_app
+                app=flask_app
             )
             print(f"✓ Emails sent for order {order.order_number}")
         except Exception as e:

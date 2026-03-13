@@ -90,6 +90,10 @@ export const menuAPI = {
     return apiRequest('/menu/all');
   },
 
+  searchFoods: async (query: string) => {
+    return apiRequest(`/menu/search?q=${encodeURIComponent(query)}`);
+  },
+
   getFoodsByCategory: async (category: string) => {
     return apiRequest(`/menu/category/${category}`);
   },
@@ -98,6 +102,7 @@ export const menuAPI = {
     return apiRequest(`/menu/${foodId}`);
   },
 
+  // Admin operations
   addFood: async (data: any) => {
     return apiRequest('/menu/add', {
       method: 'POST',
@@ -106,15 +111,43 @@ export const menuAPI = {
   },
 
   updateFood: async (foodId: string, data: any) => {
-    return apiRequest(`/menu/${foodId}`, {
+    return apiRequest(`/menu/items/${foodId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   },
 
   deleteFood: async (foodId: string) => {
-    return apiRequest(`/menu/${foodId}`, {
+    return apiRequest(`/menu/items/${foodId}`, {
       method: 'DELETE',
+    });
+  },
+};
+
+// Rewards API
+export const rewardsAPI = {
+  getMyPoints: async () => {
+    return apiRequest('/rewards/my-points');
+  },
+
+  getRewardTransactions: async () => {
+    return apiRequest('/rewards/transactions');
+  },
+
+  redeemPoints: async (points: number) => {
+    return apiRequest('/rewards/redeem', {
+      method: 'POST',
+      body: JSON.stringify({ points }),
+    });
+  },
+
+  getAvailableRewards: async () => {
+    return apiRequest('/rewards/available');
+  },
+
+  claimDailyBonus: async () => {
+    return apiRequest('/rewards/claim-daily-bonus', {
+      method: 'POST',
     });
   },
 };
@@ -307,4 +340,69 @@ export const cartAPI = {
       method: 'DELETE',
     });
   },
+};
+
+// Combined API export for convenience
+export const api = {
+  // Export constants
+  API_BASE_URL,
+  getToken,
+  setToken,
+  removeToken,
+  
+  // Auth methods
+  ...authAPI,
+  
+  // Menu methods
+  getAllFoods: menuAPI.getAllFoods,
+  searchFoods: menuAPI.searchFoods,
+  getFoodsByCategory: menuAPI.getFoodsByCategory,
+  getFoodDetail: menuAPI.getFoodDetail,
+  addFood: menuAPI.addFood,
+  updateFood: menuAPI.updateFood,
+  deleteFood: menuAPI.deleteFood,
+  
+  // Order methods
+  createOrder: orderAPI.createOrder,
+  getMyOrders: orderAPI.getMyOrders,
+  getOrderDetail: orderAPI.getOrderDetail,
+  cancelOrder: orderAPI.cancelOrder,
+  confirmOrder: orderAPI.confirmOrder,
+  updateOrderStatus: orderAPI.updateOrderStatus,
+  
+  // Rewards methods
+  getMyPoints: rewardsAPI.getMyPoints,
+  getRewardTransactions: rewardsAPI.getRewardTransactions,
+  redeemPoints: rewardsAPI.redeemPoints,
+  getAvailableRewards: rewardsAPI.getAvailableRewards,
+  claimDailyBonus: rewardsAPI.claimDailyBonus,
+  
+  // Runner methods
+  registerAsRunner: runnerAPI.registerAsRunner,
+  getRunnerProfile: runnerAPI.getRunnerProfile,
+  updateLocation: runnerAPI.updateLocation,
+  toggleRunnerAvailability: runnerAPI.toggleAvailability,
+  getAvailableDeliveries: runnerAPI.getAvailableDeliveries,
+  acceptDelivery: runnerAPI.acceptDelivery,
+  getMyDeliveries: runnerAPI.getMyDeliveries,
+  updateDeliveryStatus: runnerAPI.updateDeliveryStatus,
+  rateDelivery: runnerAPI.rateDelivery,
+  
+  // Admin methods
+  getDashboardStats: adminAPI.getDashboardStats,
+  getAllOrders: adminAPI.getAllOrders,
+  assignRunnerToOrder: adminAPI.assignRunnerToOrder,
+  markOrderReady: adminAPI.markOrderReady,
+  getAllUsers: adminAPI.getAllUsers,
+  updateUserRole: adminAPI.updateUserRole,
+  getFoodsInventory: adminAPI.getFoodsInventory,
+  toggleFoodAvailability: adminAPI.toggleFoodAvailability,
+  getSalesReport: adminAPI.getSalesReport,
+  
+  // Cart methods
+  getCart: cartAPI.getCart,
+  addToCart: cartAPI.addToCart,
+  updateCartItem: cartAPI.updateCartItem,
+  removeFromCart: cartAPI.removeFromCart,
+  clearCart: cartAPI.clearCart,
 };

@@ -13,6 +13,12 @@ def generate_order_number():
     random_part = str(uuid.uuid4()).split('-')[0][:4].upper()
     return f'ORD-{date}-{random_part}'
 
+def get_available_runner():
+    """Find an available runner for delivery"""
+    # Get a runner who is registered and available
+    runner = User.query.filter_by(role='runner').first()
+    return runner
+
 @order_bp.route('/create', methods=['POST'])
 @jwt_required()
 def create_order():
@@ -74,15 +80,24 @@ def create_order():
         for order_item in order_items:
             order.items.append(order_item)
         
-        # Create delivery record
+        # Create delivery record and auto-assign runner
         delivery = Delivery(
             id=str(uuid.uuid4()),
             order_id=order.id,
             status='pending',
-            estimated_time=datetime.utcnow() + timedelta(minutes=45)
+            estimated_time_minutes=45
         )
-        db.session.add(delivery)
         
+        # Try to assign an available runner
+        runner = get_available_runner()
+        if runner:
+            delivery.runner_id = runner.id
+            delivery.status = 'assigned'
+            order.status = 'confirmed'
+        else:
+            order.status = 'pending'
+        
+        db.session.add(delivery)
         db.session.add(order)
         db.session.commit()
         
@@ -113,17 +128,72 @@ def get_my_orders():
 @order_bp.route('/<order_id>', methods=['GET'])
 @jwt_required()
 def get_order_detail(order_id):
-    """Get order details"""
+    """Get order details with delivery tracking"""
     try:
+        user_id = get_jwt_identity()
         order = Order.query.get(order_id)
         
         if not order:
             return jsonify({'error': 'Order not found'}), 404
         
-        return jsonify(order.to_dict()), 200
+        # Only allow user to view their own orders
+        if order.customer_id != user_id and User.query.get(user_id).role not in ['admin', 'staff']:
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        order_dict = order.to_dict()
+        
+        # Add delivery tracking information
+        if order.delivery:
+            delivery_dict = order.delivery.to_dict()
+            order_dict['delivery'] = delivery_dict
+            order_dict['tracked_status'] = get_order_tracked_status(order.delivery)
+        
+        return jsonify(order_dict), 200
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+def get_order_tracked_status(delivery):
+    """Get user-friendly tracked status"""
+    status_mapping = {
+        'pending': {
+            'stage': 1,
+            'title': 'Order Received',
+            'description': 'Your order has been received and is being prepared',
+            'icon': 'CheckCircle'
+        },
+        'assigned': {
+            'stage': 2,
+            'title': 'Delivery Partner Assigned',
+            'description': f'Your delivery partner will pick up your order soon',
+            'icon': 'User'
+        },
+        'picked_up': {
+            'stage': 3,
+            'title': 'Order on the Way',
+            'description': 'Your order is on the way to you',
+            'icon': 'Bike'
+        },
+        'in_transit': {
+            'stage': 3,
+            'title': 'Order on the Way',
+            'description': 'Your order is on the way to you',
+            'icon': 'Bike'
+        },
+        'delivered': {
+            'stage': 4,
+            'title': 'Order Delivered',
+            'description': 'Your order has been delivered',
+            'icon': 'CheckCircle'
+        }
+    }
+    
+    return status_mapping.get(delivery.status, {
+        'stage': 0,
+        'title': 'Processing',
+        'description': 'Your order is being processed',
+        'icon': 'Clock'
+    })
 
 @order_bp.route('/<order_id>/cancel', methods=['POST'])
 @jwt_required()

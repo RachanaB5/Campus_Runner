@@ -1,12 +1,16 @@
 import { Link, useLocation } from "react-router";
-import { ShoppingCart, User, Award, Bike, Home, Clock, LogIn } from "lucide-react";
+import { ShoppingCart, User, Award, Bike, Home, Clock, LogIn, Settings } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
+import { useState } from "react";
+import { api } from "../services/api";
 
 export function Header() {
   const location = useLocation();
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, user } = useAuth();
   const { getTotalItems } = useCart();
+  const [isRunnerMode, setIsRunnerMode] = useState(false);
+  const [isTogglingRunner, setIsTogglingRunner] = useState(false);
   
   const isActive = (path: string) => {
     return location.pathname === path;
@@ -18,6 +22,46 @@ export function Header() {
   }
 
   const cartItemCount = getTotalItems();
+  const isAdmin = user && user.role === 'admin';
+
+  const handleRunnerToggle = async () => {
+    try {
+      setIsTogglingRunner(true);
+      
+      if (!isRunnerMode) {
+        // Register as runner
+        const response = await api.registerAsRunner({
+          vehicle_type: "bike",
+          license_number: "DL-01-AB-2024",
+        });
+        if (response) {
+          setIsRunnerMode(true);
+          alert("Registered as runner! You can now accept deliveries.");
+        }
+      } else {
+        // Toggle availability
+        const response = await api.toggleRunnerAvailability();
+        if (response) {
+          setIsRunnerMode(!isRunnerMode);
+          alert(
+            response.is_available
+              ? "You are now available for deliveries"
+              : "You are now unavailable"
+          );
+        }
+      }
+    } catch (error: any) {
+      console.error("Error toggling runner mode:", error);
+      // If already registered, just toggle the mode
+      if (error.response?.status === 400 || error.message?.includes("already")) {
+        setIsRunnerMode(!isRunnerMode);
+      } else {
+        alert("Failed to toggle runner mode. Please try again.");
+      }
+    } finally {
+      setIsTogglingRunner(false);
+    }
+  };
 
   return (
     <header className="bg-white shadow-sm sticky top-0 z-50">
@@ -43,33 +87,56 @@ export function Header() {
               <Home className="w-5 h-5" />
               <span>Menu</span>
             </Link>
-            <Link 
-              to="/runner" 
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                isActive('/runner') ? 'bg-orange-50 text-orange-600' : 'text-gray-600 hover:text-orange-600'
-              }`}
-            >
-              <Bike className="w-5 h-5" />
-              <span>Runner Mode</span>
-            </Link>
-            <Link 
-              to="/rewards" 
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                isActive('/rewards') ? 'bg-orange-50 text-orange-600' : 'text-gray-600 hover:text-orange-600'
-              }`}
-            >
-              <Award className="w-5 h-5" />
-              <span>Rewards</span>
-            </Link>
-            <Link 
-              to="/orders" 
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                isActive('/orders') ? 'bg-orange-50 text-orange-600' : 'text-gray-600 hover:text-orange-600'
-              }`}
-            >
-              <Clock className="w-5 h-5" />
-              <span>Orders</span>
-            </Link>
+            {isLoggedIn && (
+              <>
+                <button
+                  onClick={handleRunnerToggle}
+                  disabled={isTogglingRunner}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                    isRunnerMode
+                      ? 'bg-orange-50 text-orange-600'
+                      : 'text-gray-600 hover:text-orange-600'
+                  } disabled:opacity-50`}
+                  title={isRunnerMode ? "Runner Mode Active" : "Click to Enable Runner Mode"}
+                >
+                  <Bike className="w-5 h-5" />
+                  <span>Runner Mode</span>
+                  {isRunnerMode && (
+                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  )}
+                </button>
+                <Link 
+                  to="/rewards" 
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                    isActive('/rewards') ? 'bg-orange-50 text-orange-600' : 'text-gray-600 hover:text-orange-600'
+                  }`}
+                >
+                  <Award className="w-5 h-5" />
+                  <span>Rewards</span>
+                </Link>
+                <Link 
+                  to="/orders" 
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                    isActive('/orders') ? 'bg-orange-50 text-orange-600' : 'text-gray-600 hover:text-orange-600'
+                  }`}
+                >
+                  <Clock className="w-5 h-5" />
+                  <span>Orders</span>
+                </Link>
+                {isAdmin && (
+                  <Link 
+                    to="/admin" 
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                      isActive('/admin') ? 'bg-orange-50 text-orange-600' : 'text-gray-600 hover:text-orange-600'
+                    }`}
+                    title="Admin Panel"
+                  >
+                    <Settings className="w-5 h-5" />
+                    <span>Admin</span>
+                  </Link>
+                )}
+              </>
+            )}
           </nav>
 
           <div className="flex items-center gap-4">
@@ -116,33 +183,52 @@ export function Header() {
             <Home className="w-5 h-5" />
             <span className="text-xs">Menu</span>
           </Link>
-          <Link 
-            to="/runner" 
-            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg ${
-              isActive('/runner') ? 'text-orange-600' : 'text-gray-600'
-            }`}
-          >
-            <Bike className="w-5 h-5" />
-            <span className="text-xs">Runner</span>
-          </Link>
-          <Link 
-            to="/rewards" 
-            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg ${
-              isActive('/rewards') ? 'text-orange-600' : 'text-gray-600'
-            }`}
-          >
-            <Award className="w-5 h-5" />
-            <span className="text-xs">Rewards</span>
-          </Link>
-          <Link 
-            to="/orders" 
-            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg ${
-              isActive('/orders') ? 'text-orange-600' : 'text-gray-600'
-            }`}
-          >
-            <Clock className="w-5 h-5" />
-            <span className="text-xs">Orders</span>
-          </Link>
+          {isLoggedIn && (
+            <>
+              <button
+                onClick={handleRunnerToggle}
+                disabled={isTogglingRunner}
+                className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg ${
+                  isRunnerMode ? 'text-orange-600' : 'text-gray-600'
+                } disabled:opacity-50`}
+              >
+                <Bike className="w-5 h-5" />
+                <span className="text-xs">Runner</span>
+                {isRunnerMode && (
+                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                )}
+              </button>
+              <Link 
+                to="/rewards" 
+                className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg ${
+                  isActive('/rewards') ? 'text-orange-600' : 'text-gray-600'
+                }`}
+              >
+                <Award className="w-5 h-5" />
+                <span className="text-xs">Rewards</span>
+              </Link>
+              <Link 
+                to="/orders" 
+                className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg ${
+                  isActive('/orders') ? 'text-orange-600' : 'text-gray-600'
+                }`}
+              >
+                <Clock className="w-5 h-5" />
+                <span className="text-xs">Orders</span>
+              </Link>
+              {isAdmin && (
+                <Link 
+                  to="/admin" 
+                  className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg ${
+                    isActive('/admin') ? 'text-orange-600' : 'text-gray-600'
+                  }`}
+                >
+                  <Settings className="w-5 h-5" />
+                  <span className="text-xs">Admin</span>
+                </Link>
+              )}
+            </>
+          )}
         </div>
       </div>
     </header>

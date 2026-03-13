@@ -25,6 +25,8 @@ class Delivery(db.Model):
             'order_id': self.order_id,
             'runner_id': self.runner_id,
             'runner_name': self.runner.name if self.runner else None,
+            'runner_phone': self.runner.phone if self.runner else None,
+            'runner_image': self.runner.profile_image if self.runner else None,
             'status': self.status,
             'pickup_location': self.pickup_location,
             'delivery_location': self.delivery_location,
@@ -32,6 +34,8 @@ class Delivery(db.Model):
             'delivery_fee': self.delivery_fee,
             'estimated_time_minutes': self.estimated_time_minutes,
             'actual_delivery_time': self.actual_delivery_time.isoformat() if self.actual_delivery_time else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'rating': self.rating,
             'review': self.review,
         }

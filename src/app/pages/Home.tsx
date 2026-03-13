@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, ShoppingCart, X, Plus, Minus, Trash2, ArrowRight, Leaf } from "lucide-react";
+import { Search, ShoppingCart, X, Plus, Minus, Trash2, ArrowRight, Leaf, Bike, MapPin, Clock } from "lucide-react";
 import { menuItems } from "../data/mockData";
 import { FoodCard } from "../components/FoodCard";
 import { useCart } from "../context/CartContext";
@@ -44,6 +44,9 @@ export function Home() {
   const [items, setItems] = useState(menuItems);
   const [isLoading, setIsLoading] = useState(true);
   const [cartOpen, setCartOpen] = useState(false);
+  const [showDeliveries, setShowDeliveries] = useState(false);
+  const [availableDeliveries, setAvailableDeliveries] = useState<any[]>([]);
+  const [isLoadingDeliveries, setIsLoadingDeliveries] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -131,6 +134,36 @@ export function Home() {
     navigate("/checkout");
   };
 
+  const handleRunnerClick = async () => {
+    if (!isLoggedIn) {
+      navigate("/login");
+      return;
+    }
+    
+    setShowDeliveries(true);
+    setIsLoadingDeliveries(true);
+    try {
+      const response = await api.getAvailableDeliveries();
+      setAvailableDeliveries(response?.deliveries || []);
+    } catch (error) {
+      console.error("Error fetching deliveries:", error);
+      setAvailableDeliveries([]);
+    } finally {
+      setIsLoadingDeliveries(false);
+    }
+  };
+
+  const handleAcceptDelivery = async (deliveryId: string) => {
+    try {
+      await api.acceptDelivery(deliveryId);
+      setAvailableDeliveries(availableDeliveries.filter(d => d.id !== deliveryId));
+      alert("Delivery accepted! Head to the restaurant.");
+    } catch (error) {
+      console.error("Error accepting delivery:", error);
+      alert("Failed to accept delivery. Please try again.");
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       {/* ── Hero Banner ─────────────────────────────────────────── */}
@@ -180,6 +213,14 @@ export function Home() {
             className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white shadow-sm"
           />
         </div>
+        <button
+          onClick={handleRunnerClick}
+          className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-xl shadow-sm transition-colors font-medium"
+          title="View available deliveries"
+        >
+          <Bike className="w-5 h-5" />
+          <span className="hidden sm:inline">Deliveries</span>
+        </button>
         <button
           onClick={() => setCartOpen(true)}
           className="relative flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-5 py-3 rounded-xl shadow-sm transition-colors font-medium"
@@ -396,7 +437,83 @@ export function Home() {
         </div>
       )}
 
-      {/* slide-in animation */}
+      {/* ── Deliveries Modal ────────────────────────────────────── */}
+      {showDeliveries && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* backdrop */}
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowDeliveries(false)} />
+
+          {/* modal */}
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+            {/* header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b bg-blue-500 text-white">
+              <div className="flex items-center gap-3">
+                <Bike className="w-5 h-5" />
+                <h2 className="text-lg font-bold">Available Deliveries</h2>
+              </div>
+              <button
+                onClick={() => setShowDeliveries(false)}
+                className="p-1 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* body */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {isLoadingDeliveries ? (
+                <div className="flex flex-col items-center justify-center h-full">
+                  <Bike className="w-16 h-16 text-gray-300 mb-4 animate-bounce" />
+                  <p className="text-gray-600">Loading deliveries...</p>
+                </div>
+              ) : availableDeliveries.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center">
+                  <Bike className="w-16 h-16 text-gray-300 mb-4" />
+                  <p className="text-gray-600 font-semibold">No deliveries available</p>
+                  <p className="text-gray-400 text-sm mt-2">Check back later for new orders to deliver</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {availableDeliveries.map((delivery) => (
+                    <div key={delivery.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h3 className="font-semibold text-gray-900">Order #{delivery.order_id}</h3>
+                          <p className="text-sm text-gray-600 mt-1">₹{delivery.total_amount?.toFixed(2) || "N/A"}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-green-600 font-semibold">+{Math.floor((delivery.total_amount || 0) / 10)} pts</p>
+                        </div>
+                      </div>
+
+                      {delivery.delivery_address && (
+                        <div className="flex items-center gap-2 text-gray-600 mb-2">
+                          <MapPin className="w-4 h-4" />
+                          <span className="text-sm">{delivery.delivery_address}</span>
+                        </div>
+                      )}
+
+                      {delivery.customer_phone && (
+                        <div className="flex items-center gap-2 text-gray-600 mb-3">
+                          <span className="text-sm">Phone: {delivery.customer_phone}</span>
+                        </div>
+                      )}
+
+                      <button
+                        onClick={() => handleAcceptDelivery(delivery.id)}
+                        className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Bike className="w-4 h-4" />
+                        Accept Delivery
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       <style>{`
         @keyframes slideInRight {
           from { transform: translateX(100%); opacity: 0; }
