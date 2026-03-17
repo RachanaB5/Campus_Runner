@@ -11,11 +11,26 @@ def send_email_in_background(app, subject, recipients, html):
             with app.app_context():
                 from flask_mail import Mail
                 mail = Mail(app)
-                msg = Message(subject=subject, recipients=recipients, html=html)
+                
+                # Use email as sender, Flask-Mail will use it with display name
+                sender_email = app.config.get('MAIL_USERNAME', 'noreply@campusrunner.com')
+                
+                msg = Message(
+                    subject=subject, 
+                    recipients=recipients, 
+                    html=html,
+                    sender=("Campus Runner", sender_email)
+                )
+                
+                print(f"📧 Sending email:")
+                print(f"  From: {sender_email}")
+                print(f"  To: {recipients}")
+                print(f"  Subject: {subject}")
+                
                 mail.send(msg)
-                print(f"✓ Email successfully sent to {recipients}")
+                print(f"✅ Email successfully sent to {recipients}")
         except Exception as e:
-            print(f"⚠️ Error sending email: {str(e)}")
+            print(f"❌ Error sending email to {recipients}: {str(e)}")
             print(f"📍 Traceback: {traceback.format_exc()}")
     
     thread = Thread(target=send_email)
@@ -175,13 +190,7 @@ def send_order_ready_notification(user_email, user_name, order_number, app=None)
         </html>
         """
         
-        msg = Message(
-            subject=subject,
-            recipients=[user_email],
-            html=html
-        )
-        
-        Thread(target=send_async_email, args=(app, msg)).start()
+        send_email_in_background(app, subject, [user_email], html)
         return True
         
     except Exception as e:

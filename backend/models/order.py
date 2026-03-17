@@ -7,7 +7,7 @@ class Order(db.Model):
     id = db.Column(db.String(36), primary_key=True)
     customer_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
     order_number = db.Column(db.String(50), unique=True)
-    status = db.Column(db.String(50), default='pending')  # pending, confirmed, preparing, ready, picked_up, delivered, cancelled
+    status = db.Column(db.String(50), default='pending')  # pending, received, preparing, ready, picked_up, in_transit, delivered, cancelled
     total_amount = db.Column(db.Float, nullable=False)
     delivery_fee = db.Column(db.Float, default=0.0)
     payment_status = db.Column(db.String(50), default='pending')  # pending, completed, failed
@@ -16,6 +16,15 @@ class Order(db.Model):
     customer_phone = db.Column(db.String(20))
     special_instructions = db.Column(db.Text)
     estimated_delivery_time = db.Column(db.DateTime)
+    
+    # Tracking timestamps
+    received_by_canteen_at = db.Column(db.DateTime)  # When canteen receives order
+    preparation_started_at = db.Column(db.DateTime)  # When canteen starts preparing
+    ready_for_pickup_at = db.Column(db.DateTime)  # When order is ready
+    picked_up_at = db.Column(db.DateTime)  # When runner picks up
+    in_transit_at = db.Column(db.DateTime)  # When runner starts delivery
+    delivered_at = db.Column(db.DateTime)  # When order is delivered
+    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -37,6 +46,14 @@ class Order(db.Model):
             'customer_phone': self.customer_phone,
             'special_instructions': self.special_instructions,
             'estimated_delivery_time': self.estimated_delivery_time.isoformat() if self.estimated_delivery_time else None,
+            'tracking': {
+                'received_by_canteen_at': self.received_by_canteen_at.isoformat() if self.received_by_canteen_at else None,
+                'preparation_started_at': self.preparation_started_at.isoformat() if self.preparation_started_at else None,
+                'ready_for_pickup_at': self.ready_for_pickup_at.isoformat() if self.ready_for_pickup_at else None,
+                'picked_up_at': self.picked_up_at.isoformat() if self.picked_up_at else None,
+                'in_transit_at': self.in_transit_at.isoformat() if self.in_transit_at else None,
+                'delivered_at': self.delivered_at.isoformat() if self.delivered_at else None,
+            },
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }
         if include_items and self.items:

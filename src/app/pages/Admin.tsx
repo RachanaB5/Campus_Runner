@@ -35,6 +35,8 @@ export function Admin() {
     image_url: "",
     prep_time: 15,
     is_veg: true,
+    available: true,
+    rating: 4.5,
   });
 
   useEffect(() => {
@@ -137,6 +139,8 @@ export function Admin() {
       image_url: food.image_url,
       prep_time: food.prep_time,
       is_veg: food.is_veg,
+      available: food.available,
+      rating: food.rating,
     });
     setShowForm(true);
   };
@@ -150,6 +154,8 @@ export function Admin() {
       image_url: "",
       prep_time: 15,
       is_veg: true,
+      available: true,
+      rating: 4.5,
     });
     setEditingFood(null);
     setShowForm(false);

@@ -301,3 +301,106 @@ def update_order_status(order_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+@order_bp.route('/<order_id>/receive', methods=['POST'])
+@jwt_required()
+def receive_order(order_id):
+    """Mark order as received by canteen"""
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        # Check if user is admin or canteen staff
+        if user.role not in ['admin', 'staff']:
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        order = Order.query.get(order_id)
+        if not order:
+            return jsonify({'error': 'Order not found'}), 404
+        
+        order.status = 'received'
+        order.received_by_canteen_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        print(f"✅ Order {order.order_number} received by canteen")
+        
+        return jsonify({
+            'message': 'Order received by canteen',
+            'order': order.to_dict()
+        }), 200
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@order_bp.route('/<order_id>/start-preparation', methods=['POST'])
+@jwt_required()
+def start_preparation(order_id):
+    """Mark order as preparation started"""
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if user.role not in ['admin', 'staff']:
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        order = Order.query.get(order_id)
+        if not order:
+            return jsonify({'error': 'Order not found'}), 404
+        
+        if order.status != 'received':
+            return jsonify({'error': 'Order must be received first'}), 400
+        
+        order.status = 'preparing'
+        order.preparation_started_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        print(f"✅ Order {order.order_number} preparation started")
+        
+        return jsonify({
+            'message': 'Order preparation started',
+            'order': order.to_dict()
+        }), 200
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@order_bp.route('/<order_id>/mark-ready', methods=['POST'])
+@jwt_required()
+def mark_ready(order_id):
+    """Mark order as ready for pickup"""
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if user.role not in ['admin', 'staff']:
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        order = Order.query.get(order_id)
+        if not order:
+            return jsonify({'error': 'Order not found'}), 404
+        
+        if order.status != 'preparing':
+            return jsonify({'error': 'Order must be in preparation'}), 400
+        
+        order.status = 'ready'
+        order.ready_for_pickup_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        print(f"✅ Order {order.order_number} ready for pickup")
+        
+        return jsonify({
+            'message': 'Order marked as ready',
+            'order': order.to_dict()
+        }), 200
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500

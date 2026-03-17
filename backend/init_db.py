@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Initialize the database with sample canteen food data
+Initialize the database with sample canteen food data and admin user
 """
 from app import app
 from models import db, User, Food
+import uuid
 
 # Fixed food IDs for consistency
 FOOD_IDS = {
@@ -196,6 +197,29 @@ def init_database():
         for food in all_foods:
             print(f"  {food.name:30} | ₹{food.price:6.2f} | {food.prep_time}min | ⭐{food.rating}")
         print("-" * 60)
+        
+        # Create default admin user if doesn't exist
+        admin_email = 'admin@rvu.edu.in'
+        existing_admin = User.query.filter_by(email=admin_email).first()
+        
+        if not existing_admin:
+            admin_user = User(
+                id=str(uuid.uuid4()),
+                name='Admin',
+                email=admin_email,
+                phone='9876543210',
+                role='admin',
+                is_verified=True
+            )
+            admin_user.set_password('admin@123')
+            db.session.add(admin_user)
+            db.session.commit()
+            print("\n✓ Default admin user created:")
+            print(f"  📧 Email: {admin_email}")
+            print(f"  🔑 Password: admin@123")
+        else:
+            print("\n✓ Admin user already exists")
+        
         print("\n✓ Database initialization complete!")
 
 if __name__ == '__main__':

@@ -221,6 +221,37 @@ export const runnerAPI = {
     });
   },
 
+  // New order tracking endpoints
+  getAvailableOrders: async () => {
+    return apiRequest('/runner/available-orders');
+  },
+
+  pickupOrder: async (orderId: string) => {
+    return apiRequest(`/runner/pickup-order/${orderId}`, {
+      method: 'POST',
+    });
+  },
+
+  markInTransit: async (orderId: string) => {
+    return apiRequest(`/runner/mark-in-transit/${orderId}`, {
+      method: 'POST',
+    });
+  },
+
+  deliverOrder: async (orderId: string) => {
+    return apiRequest(`/runner/deliver-order/${orderId}`, {
+      method: 'POST',
+    });
+  },
+
+  confirmDelivery: async (orderId: string, otp: string) => {
+    return apiRequest(`/runner/confirm-delivery/${orderId}`, {
+      method: 'POST',
+      body: JSON.stringify({ otp }),
+    });
+  },
+
+  // Legacy endpoints for backward compatibility
   getAvailableDeliveries: async () => {
     return apiRequest('/runner/available-deliveries');
   },
@@ -382,6 +413,11 @@ export const api = {
   getRunnerProfile: runnerAPI.getRunnerProfile,
   updateLocation: runnerAPI.updateLocation,
   toggleRunnerAvailability: runnerAPI.toggleAvailability,
+  getAvailableOrders: runnerAPI.getAvailableOrders,
+  pickupOrder: runnerAPI.pickupOrder,
+  markInTransit: runnerAPI.markInTransit,
+  deliverOrder: runnerAPI.deliverOrder,
+  confirmDelivery: runnerAPI.confirmDelivery,
   getAvailableDeliveries: runnerAPI.getAvailableDeliveries,
   acceptDelivery: runnerAPI.acceptDelivery,
   getMyDeliveries: runnerAPI.getMyDeliveries,

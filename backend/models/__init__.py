@@ -11,5 +11,6 @@ from models.reward_points import RewardPoints, RewardTransaction
 from models.token import Token
 from models.cart import Cart, CartItem
 from models.checkout import Checkout
+from models.otp import OrderOTP
 
-__all__ = ['db', 'User', 'Food', 'Order', 'OrderItem', 'Delivery', 'Runner', 'RewardPoints', 'RewardTransaction', 'Token', 'Cart', 'CartItem', 'Checkout']
+__all__ = ['db', 'User', 'Food', 'Order', 'OrderItem', 'Delivery', 'Runner', 'RewardPoints', 'RewardTransaction', 'Token', 'Cart', 'CartItem', 'Checkout', 'OrderOTP']

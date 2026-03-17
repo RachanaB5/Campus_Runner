@@ -39,22 +39,50 @@ app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER', 'noreply@ca
 from models import db
 db.init_app(app)
 
-CORS(app)
+# Improved CORS configuration
+CORS(app, resources={
+    r"/api/*": {
+        "origins": ["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173", "http://127.0.0.1:3000"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": True
+    }
+})
+
 jwt = JWTManager(app)
 
+# Handle CORS preflight requests
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        response = jsonify({'success': True})
+        response.headers.add("Access-Control-Allow-Origin", request.headers.get('Origin', '*'))
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization")
+        response.headers.add("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS")
+        response.headers.add("Access-Control-Allow-Credentials", "true")
+        return response, 200
+
 # Initialize Flask-Mail
-mail = Mail()
-mail.init_app(app)
+try:
+    mail = Mail()
+    mail.init_app(app)
+    print("✅ Mail service initialized successfully")
+except Exception as mail_error:
+    print(f"⚠️ Mail initialization warning: {str(mail_error)}")
+    mail = Mail()
 
 # Print email configuration for debugging
-with app.app_context():
-    print(f"\n=== EMAIL CONFIGURATION ===")
-    print(f"Mail Server: {app.config.get('MAIL_SERVER')}")
-    print(f"Mail Port: {app.config.get('MAIL_PORT')}")
-    print(f"Mail Username: {app.config.get('MAIL_USERNAME')}")
-    print(f"Mail TLS: {app.config.get('MAIL_USE_TLS')}")
-    print(f"Mail Has Password: {'Yes' if app.config.get('MAIL_PASSWORD') else 'No'}")
-    print(f"===========================\n")
+try:
+    with app.app_context():
+        print(f"\n=== EMAIL CONFIGURATION ===")
+        print(f"Mail Server: {app.config.get('MAIL_SERVER')}")
+        print(f"Mail Port: {app.config.get('MAIL_PORT')}")
+        print(f"Mail Username: {app.config.get('MAIL_USERNAME')}")
+        print(f"Mail TLS: {app.config.get('MAIL_USE_TLS')}")
+        print(f"Mail Has Password: {'Yes' if app.config.get('MAIL_PASSWORD') else 'No'}")
+        print(f"===========================\n")
+except Exception as config_error:
+    print(f"⚠️ Error printing config: {str(config_error)}")
 
 # Register blueprints (routes)
 from routes.auth_routes import auth_bp
@@ -75,13 +103,36 @@ app.register_blueprint(rewards_bp, url_prefix='/api/rewards')
 app.register_blueprint(staff_admin_bp, url_prefix='/api/admin')
 app.register_blueprint(cart_bp, url_prefix='/api/cart')
 
-# Create tables
-with app.app_context():
-    db.create_all()
-    # Auto-initialize database on app startup if empty
-    from models import Food
-    if Food.query.count() == 0:
-        foods_data = [
+# Global error handlers
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({'error': 'Endpoint not found'}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({'error': 'Internal server error', 'message': str(error)}), 500
+
+@app.errorhandler(Exception)
+def handle_exception(error):
+    import traceback
+    print(f"🔴 Unhandled exception: {str(error)}")
+    print(f"📍 Traceback: {traceback.format_exc()}")
+    return jsonify({
+        'error': 'An error occurred',
+        'message': str(error),
+        'type': type(error).__name__
+    }), 500
+
+# Create tables and initialize data
+try:
+    with app.app_context():
+        db.create_all()
+        print("✅ Database tables created")
+        
+        # Auto-initialize database on app startup if empty
+        from models import Food
+        if Food.query.count() == 0:
+            foods_data = [
             # MEALS
             {'name': 'North Mini Meals', 'price': 70, 'category': 'Meals', 'is_veg': True, 'prep_time': 20, 'rating': 4.5},
             {'name': 'North Full Meals', 'price': 120, 'category': 'Meals', 'is_veg': True, 'prep_time': 25, 'rating': 4.6},
@@ -328,23 +379,59 @@ with app.app_context():
             {'name': 'Ideal - Cassata Ice Cream', 'price': 50, 'category': 'Ice Cream', 'is_veg': True, 'prep_time': 2, 'rating': 4.6},
         ]
         
-        # Add foods to database
-        for idx, food_data in enumerate(foods_data):
-            food = Food(
-                id=f'food-{str(idx+1).zfill(3)}',
-                available=True,
-                review_count=int(food_data.get('rating', 4.5) * 10),
-                **food_data
-            )
-            db.session.add(food)
-        db.session.commit()
+            # Add foods to database
+            for idx, food_data in enumerate(foods_data):
+                food = Food(
+                    id=f'food-{str(idx+1).zfill(3)}',
+                    available=True,
+                    review_count=int(food_data.get('rating', 4.5) * 10),
+                    **food_data
+                )
+                db.session.add(food)
+            db.session.commit()
+            print("✓ Food items added to database")
+        
+        # Create default admin user if doesn't exist
+        try:
+            from models import User
+            import uuid
+            admin_email = 'admin@rvu.edu.in'
+            existing_admin = User.query.filter_by(email=admin_email).first()
+            
+            if not existing_admin:
+                admin_user = User(
+                    id=str(uuid.uuid4()),
+                    name='Admin',
+                    email=admin_email,
+                    phone='9876543210',
+                    role='admin',
+                    is_verified=True
+                )
+                admin_user.set_password('admin@123')
+                db.session.add(admin_user)
+                db.session.commit()
+                print("✅ Default admin user created")
+                print(f"   📧 Email: {admin_email}")
+                print(f"   🔑 Password: admin@123")
+            else:
+                print("✅ Admin user already exists")
+        except Exception as admin_error:
+            print(f"⚠️ Admin creation error: {str(admin_error)}")
+            db.session.rollback()
+            
+        print("✅ Database initialization complete!")
+        
+except Exception as init_error:
+    print(f"❌ Database initialization failed: {str(init_error)}")
+    import traceback
+    print(f"📍 Traceback: {traceback.format_exc()}")
 
 @app.route('/', methods=['GET'])
 def root():
     return {
         'message': 'Campus Runner Backend API',
         'version': '1.0.0',
-        'status': 'running',
+        'status': 'running ✅',
         'endpoints': {
             'health': '/api/health',
             'auth': '/api/auth/*',

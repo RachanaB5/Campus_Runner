@@ -13,11 +13,11 @@ def register():
         data = request.get_json()
         
         if not data or not data.get('email') or not data.get('password') or not data.get('name'):
-            return jsonify({'error': 'Missing required fields'}), 400
+            return jsonify({'error': 'Missing required fields: name, email, password'}), 400
         
         # Check if user exists
         if User.query.filter_by(email=data['email']).first():
-            return jsonify({'error': 'User already exists'}), 409
+            return jsonify({'error': 'User already exists with this email'}), 409
         
         # Create new user
         user = User(
@@ -25,7 +25,8 @@ def register():
             name=data['name'],
             email=data['email'],
             phone=data.get('phone'),
-            role=data.get('role', 'customer')
+            role=data.get('role', 'customer'),
+            is_verified=True
         )
         user.set_password(data['password'])
         
@@ -46,6 +47,8 @@ def register():
         # Create access token
         access_token = create_access_token(identity=user.id, expires_delta=timedelta(days=30))
         
+        print(f"✅ User registered: {data['email']}")
+        
         return jsonify({
             'message': 'User registered successfully',
             'user': user.to_dict(),
@@ -53,8 +56,11 @@ def register():
         }), 201
     
     except Exception as e:
+        print(f"❌ Registration error: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Registration failed', 'message': str(e)}), 500
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
@@ -68,10 +74,13 @@ def login():
         user = User.query.filter_by(email=data['email']).first()
         
         if not user or not user.check_password(data['password']):
-            return jsonify({'error': 'Invalid credentials'}), 401
+            print(f"⚠️ Failed login attempt for: {data['email']}")
+            return jsonify({'error': 'Invalid email or password'}), 401
         
         # Create access token
         access_token = create_access_token(identity=user.id, expires_delta=timedelta(days=30))
+        
+        print(f"✅ User logged in: {data['email']}")
         
         return jsonify({
             'message': 'Login successful',
@@ -80,7 +89,10 @@ def login():
         }), 200
     
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"❌ Login error: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({'error': 'Login failed', 'message': str(e)}), 500
 
 @auth_bp.route('/me', methods=['GET'])
 @jwt_required()
