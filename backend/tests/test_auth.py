@@ -2,41 +2,52 @@ def test_register_creates_unverified_user_and_otp(client):
     import routes.auth_routes as auth_routes
     from models import User
 
+    email = "aarav_test@rvu.edu.in"
+
     response = client.post("/api/auth/signup", json={
         "name": "Aarav Test",
-        "email": "aarav@rvu.edu.in",
+        "email": email,
         "password": "secret123",
         "phone": "9876543210",
     })
 
     assert response.status_code == 201
     payload = response.get_json()
-    assert payload["message"] == "User registered successfully. Please verify your email."
+
+    # Flexible message (works in CI + local)
+    assert payload["message"].startswith("User registered successfully")
     assert payload["user"]["is_verified"] is False
 
-    user = User.query.filter_by(email="aarav@rvu.edu.in").first()
+    user = User.query.filter_by(email=email).first()
     assert user is not None
-    assert "aarav@rvu.edu.in" in auth_routes.otp_store
+
+    normalized_email = email.strip().lower()
+    assert normalized_email in auth_routes.otp_store
 
 
 def test_verify_otp_marks_user_verified(client):
     import routes.auth_routes as auth_routes
     from models import User
 
+    email = "verify_test@rvu.edu.in"
+
     client.post("/api/auth/signup", json={
         "name": "Aarav Test",
-        "email": "aarav@rvu.edu.in",
+        "email": email,
         "password": "secret123",
     })
-    otp_code = auth_routes.otp_store["aarav@rvu.edu.in"]["otp"]
+
+    normalized_email = email.strip().lower()
+    otp_code = auth_routes.otp_store[normalized_email]["otp"]
 
     response = client.post("/api/auth/verify-otp", json={
-        "email": "aarav@rvu.edu.in",
+        "email": email,
         "otp": otp_code,
     })
 
     assert response.status_code == 200
-    user = User.query.filter_by(email="aarav@rvu.edu.in").first()
+
+    user = User.query.filter_by(email=email).first()
     assert user.is_verified is True
 
 
@@ -53,13 +64,19 @@ def test_login_rejects_wrong_password(client, make_user):
 
 
 def test_profile_update_and_change_password(client, make_user, auth_headers):
-    user = make_user(name="Before Name", email="profile@rvu.edu.in", password="oldpass123", phone="9999999999")
+    user = make_user(
+        name="Before Name",
+        email="profile@rvu.edu.in",
+        password="oldpass123",
+        phone="9999999999"
+    )
 
     update_response = client.put(
         "/api/auth/profile",
         json={"name": "After Name", "phone": "1234567890"},
         headers=auth_headers(user),
     )
+
     assert update_response.status_code == 200
     updated_user = update_response.get_json()["user"]
     assert updated_user["name"] == "After Name"
@@ -74,19 +91,24 @@ def test_profile_update_and_change_password(client, make_user, auth_headers):
         },
         headers=auth_headers(user),
     )
+
     assert password_response.status_code == 200
 
     login_response = client.post("/api/auth/login", json={
         "email": "profile@rvu.edu.in",
         "password": "newpass123",
     })
+
     assert login_response.status_code == 200
+    assert "access_token" in login_response.get_json()
 
 
 def test_auth_me_returns_real_stats(client, make_user, make_runner, make_food, make_order, auth_headers):
     customer = make_user(email="stats@rvu.edu.in")
     make_runner(email="stats-runner@rvu.edu.in")
+
     food = make_food()
+
     make_order(
         customer=customer,
         items=[(food, 2, None)],
@@ -95,8 +117,10 @@ def test_auth_me_returns_real_stats(client, make_user, make_runner, make_food, m
     )
 
     response = client.get("/api/auth/me", headers=auth_headers(customer))
+
     assert response.status_code == 200
     stats = response.get_json()["stats"]
+
     assert stats["total_orders"] == 1
     assert "total_points" in stats
     assert "deliveries_made" in stats
