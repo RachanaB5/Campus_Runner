@@ -3,6 +3,10 @@ set -e
 
 BASE_URL="http://localhost:5000/api"
 
+# Signup no longer returns a JWT until the email is verified. For this script, start the API with:
+#   export E2E_AUTH_OTP_IN_RESPONSE=1
+# so the register JSON includes a one-time "otp" field used only for automation.
+
 echo "═══════════════════════════════════════════════════════════════════════════"
 echo "🚴 RUNNER DASHBOARD & DELIVERY SYSTEM - END-TO-END TEST"
 echo "═══════════════════════════════════════════════════════════════════════════"
@@ -54,14 +58,25 @@ fi
 echo -e "${GREEN}✅ Customer registered: $CUSTOMER_EMAIL${NC}"
 echo ""
 
-# Step 3: Customer Login
-echo -e "${BLUE}STEP 3️⃣ : Customer Login${NC}"
-CUSTOMER_LOGIN=$(curl -s -X POST "$BASE_URL/auth/login" \
+# Step 3: Verify signup OTP (issues JWT)
+echo -e "${BLUE}STEP 3️⃣ : Customer Email Verification${NC}"
+SIGNUP_OTP=$(echo "$CUSTOMER_REG" | python3 -c "import sys, json; print(json.load(sys.stdin).get('otp') or '')" 2>/dev/null)
+if [ -z "$SIGNUP_OTP" ]; then
+  echo -e "${RED}❌ Register response did not include otp.${NC}"
+  echo -e "${YELLOW}Restart the API with: export E2E_AUTH_OTP_IN_RESPONSE=1${NC}"
+  exit 1
+fi
+VERIFY_JSON=$(curl -s -X POST "$BASE_URL/auth/verify-otp" \
   -H "Content-Type: application/json" \
-  -d "{\"email\": \"$CUSTOMER_EMAIL\", \"password\": \"test123\"}")
+  -d "{\"email\": \"$CUSTOMER_EMAIL\", \"otp\": \"$SIGNUP_OTP\"}")
 
-CUSTOMER_TOKEN=$(echo "$CUSTOMER_LOGIN" | python3 -c "import sys, json; print(json.load(sys.stdin)['access_token'])")
-echo -e "${GREEN}✅ Customer logged in${NC}"
+CUSTOMER_TOKEN=$(echo "$VERIFY_JSON" | python3 -c "import sys, json; print(json.load(sys.stdin).get('access_token', ''))" 2>/dev/null)
+if [ -z "$CUSTOMER_TOKEN" ]; then
+  echo -e "${RED}❌ Verify OTP failed${NC}"
+  echo "Response: $VERIFY_JSON"
+  exit 1
+fi
+echo -e "${GREEN}✅ Customer verified and session issued${NC}"
 echo ""
 
 # Step 4: Create Order

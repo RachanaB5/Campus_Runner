@@ -4,35 +4,86 @@ from datetime import datetime
 import os
 import traceback
 
+
+def _smtp_credentials_configured(app):
+    user = (app.config.get('MAIL_USERNAME') or '').strip()
+    password = (app.config.get('MAIL_PASSWORD') or '').strip()
+    return bool(user and password)
+
+
+def send_otp_email_sync(app, subject, recipients, html, otp_for_log=None):
+    """
+    Send OTP mail synchronously so misconfiguration shows up immediately.
+    Returns (sent: bool, error_message_or_none).
+    If SMTP is not configured, logs otp_for_log to the console when provided.
+    """
+    try:
+        with app.app_context():
+            if not _smtp_credentials_configured(app):
+                print("\n" + "=" * 64)
+                print("  MAIL NOT CONFIGURED — verification email was not sent.")
+                print("  Set MAIL_USERNAME + MAIL_PASSWORD (or EMAIL_ADDRESS + EMAIL_PASSWORD) in .env")
+                if otp_for_log and recipients:
+                    print(f"  OTP for {recipients[0]}: {otp_for_log}")
+                print("=" * 64 + "\n")
+                return False, "mail_not_configured"
+
+            from flask_mail import Mail
+
+            mail = Mail(app)
+            sender_email = (app.config.get('MAIL_USERNAME') or app.config.get('MAIL_DEFAULT_SENDER') or '').strip()
+            msg = Message(
+                subject=subject,
+                recipients=recipients,
+                html=html,
+                sender=("Campus Runner", sender_email),
+            )
+            print(f"📧 Sending OTP email from {sender_email} to {recipients}")
+            mail.send(msg)
+            print(f"✅ OTP email sent to {recipients}")
+            return True, None
+    except Exception as e:
+        print(f"❌ Error sending OTP email to {recipients}: {str(e)}")
+        print(traceback.format_exc())
+        if otp_for_log and recipients:
+            print(f"  (after failure) OTP for {recipients[0]} was: {otp_for_log}")
+        return False, str(e)
+
+
 def send_email_in_background(app, subject, recipients, html):
     """Send email in background thread with proper app context"""
     def send_email():
         try:
             with app.app_context():
+                if not _smtp_credentials_configured(app):
+                    print(f"⚠️ Mail not configured; skipping background email to {recipients} ({subject})")
+                    return
                 from flask_mail import Mail
                 mail = Mail(app)
-                
-                # Use email as sender, Flask-Mail will use it with display name
-                sender_email = app.config.get('MAIL_USERNAME', 'noreply@campusrunner.com')
-                
-                msg = Message(
-                    subject=subject, 
-                    recipients=recipients, 
-                    html=html,
-                    sender=("Campus Runner", sender_email)
+
+                sender_email = (
+                    (app.config.get('MAIL_USERNAME') or '').strip()
+                    or (app.config.get('MAIL_DEFAULT_SENDER') or 'noreply@campusrunner.com')
                 )
-                
+
+                msg = Message(
+                    subject=subject,
+                    recipients=recipients,
+                    html=html,
+                    sender=("Campus Runner", sender_email),
+                )
+
                 print(f"📧 Sending email:")
                 print(f"  From: {sender_email}")
                 print(f"  To: {recipients}")
                 print(f"  Subject: {subject}")
-                
+
                 mail.send(msg)
                 print(f"✅ Email successfully sent to {recipients}")
         except Exception as e:
             print(f"❌ Error sending email to {recipients}: {str(e)}")
             print(f"📍 Traceback: {traceback.format_exc()}")
-    
+
     thread = Thread(target=send_email)
     thread.daemon = True
     thread.start()

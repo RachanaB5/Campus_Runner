@@ -8,6 +8,7 @@ interface User {
   email: string;
   phone?: string;
   role: string;
+  is_verified?: boolean;
   profile_image?: string;
   avatar_url?: string;
   wallet_balance: number;
@@ -26,7 +27,14 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string, phone?: string) => Promise<void>;
+  register: (name: string, email: string, password: string, phone?: string) => Promise<{
+    requires_verification?: boolean;
+    access_token?: string;
+    user?: User;
+    email_sent?: boolean;
+    dev_otp?: string;
+  }>;
+  verifySignupOtp: (email: string, otp: string) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
   updateUser: (data: Partial<User>) => void;
@@ -75,15 +83,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (name: string, email: string, password: string, phone?: string) => {
-    try {
-      const data = await authAPI.register({ name, email, password, phone });
-      if (data.access_token) {
-        setToken(data.access_token);
-        setUser(data.user);
-        setIsLoggedIn(true);
-      }
-    } catch (error) {
-      throw error;
+    const data = await authAPI.register({ name, email, password, phone });
+    if (data.access_token) {
+      setToken(data.access_token);
+      setUser(data.user);
+      setIsLoggedIn(true);
+    }
+    return data;
+  };
+
+  const verifySignupOtp = async (email: string, otp: string) => {
+    const data = await authAPI.verifyOtp({ email, otp });
+    if (data.access_token) {
+      setToken(data.access_token);
+      setUser(data.user);
+      setIsLoggedIn(true);
     }
   };
 
@@ -129,7 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ isLoggedIn, user, isLoading, login, register, logout, updateProfile, updateUser }}>
+    <AuthContext.Provider value={{ isLoggedIn, user, isLoading, login, register, verifySignupOtp, logout, updateProfile, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

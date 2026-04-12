@@ -1,10 +1,11 @@
-import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { Mail, Lock, User, AlertCircle, Loader, ShoppingBag } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 export function Login() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { login, register } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -13,6 +14,14 @@ export function Login() {
   const [error, setError] = useState("");
   const [phone, setPhone] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [banner, setBanner] = useState("");
+
+  useEffect(() => {
+    if (searchParams.get("reset") === "1") {
+      setBanner("Your password was updated. Sign in with your new password.");
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const validateEmail = (email: string) => {
     return email.trim().toLowerCase().endsWith("@rvu.edu.in");
@@ -38,16 +47,28 @@ export function Login() {
       const normalizedEmail = email.trim().toLowerCase();
       if (isLogin) {
         await login(normalizedEmail, password);
+        navigate("/");
       } else {
         if (!name.trim()) {
           setError("Name is required");
           setIsLoading(false);
           return;
         }
-        await register(name.trim(), normalizedEmail, password, phone.trim());
+        const reg = await register(name.trim(), normalizedEmail, password, phone.trim());
+        if (reg.requires_verification) {
+          const devOtp = reg.dev_otp;
+          navigate(`/verify-email?email=${encodeURIComponent(normalizedEmail)}`, {
+            state: devOtp ? { devOtp } : undefined,
+          });
+        } else {
+          navigate("/");
+        }
       }
-      navigate("/");
     } catch (err: any) {
+      if (isLogin && err?.code === "EMAIL_NOT_VERIFIED") {
+        navigate(`/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}`);
+        return;
+      }
       setError(err?.message || (isLogin ? "Login failed" : "Registration failed"));
     } finally {
       setIsLoading(false);
@@ -96,6 +117,12 @@ export function Login() {
               Sign Up
             </button>
           </div>
+
+          {banner && (
+            <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              {banner}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
@@ -171,6 +198,14 @@ export function Login() {
               {isLoading && <Loader className="w-4 h-4 animate-spin" />}
               {isLogin ? "Login" : "Create Account"}
             </button>
+
+            {isLogin && (
+              <div className="text-center">
+                <Link to="/forgot-password" className="text-sm text-orange-600 hover:text-orange-700 font-medium">
+                  Forgot password?
+                </Link>
+              </div>
+            )}
           </form>
         </div>
 

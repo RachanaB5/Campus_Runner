@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Bell, Bike, CheckCircle, DollarSign, Power, TrendingUp } from "lucide-react";
+import { AlertCircle, Bell, Bike, CheckCircle, DollarSign, PhoneCall, Power, TrendingUp } from "lucide-react";
 import { useNavigate } from "react-router";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
@@ -22,13 +22,6 @@ interface RunnerOrder {
   delivery_location?: string;
   estimated_prep_time?: number;
   placed_at?: string;
-}
-
-interface ActiveDelivery {
-  deliveryId?: string;
-  order: RunnerOrder;
-  currentStatus: "assigned" | "picked_up" | "in_transit" | "awaiting_otp";
-  otp?: string;
 }
 
 function playNotificationChime() {
@@ -54,18 +47,19 @@ export function RunnerMode() {
   const socket = useSocket(isLoggedIn);
 
   const [availableOrders, setAvailableOrders] = useState<RunnerOrder[]>([]);
-  const [activeDeliveries, setActiveDeliveries] = useState<ActiveDelivery[]>([]);
-  const [completedCount, setCompletedCount] = useState(0);
-  const [totalEarnings, setTotalEarnings] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(false);
   const [isTogglingOnline, setIsTogglingOnline] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState("");
   const [acceptingOrderId, setAcceptingOrderId] = useState<string | null>(null);
-  const [otpInputs, setOtpInputs] = useState<Record<string, string>>({});
   const [takenOrderIds, setTakenOrderIds] = useState<string[]>([]);
-  const activeCount = activeDeliveries.length;
+  const [activeDeliveryId, setActiveDeliveryId] = useState<string | null>(null);
+  const [activeDeliveryLabel, setActiveDeliveryLabel] = useState<string>("");
+  const [activeCustomerPhone, setActiveCustomerPhone] = useState<string | null>(null);
+  const [activeAddress, setActiveAddress] = useState<string>("");
+  const [runnerDeliveries, setRunnerDeliveries] = useState(0);
+  const [runnerEarnings, setRunnerEarnings] = useState(0);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -94,10 +88,47 @@ export function RunnerMode() {
     }
   };
 
+  const refreshRunnerContext = async () => {
+    try {
+      const active = await api.getRunnerActiveDelivery();
+      if (active.active && active.delivery_id) {
+        setActiveDeliveryId(active.delivery_id);
+        setActiveDeliveryLabel(
+          active.order?.token_number || active.details?.token_number || active.delivery_id,
+        );
+        setActiveCustomerPhone(active.customer_phone || active.details?.customer_phone || null);
+        setActiveAddress(active.order?.delivery_address || active.details?.delivery_address || "");
+      } else {
+        setActiveDeliveryId(null);
+        setActiveDeliveryLabel("");
+        setActiveCustomerPhone(null);
+        setActiveAddress("");
+      }
+    } catch {
+      setActiveDeliveryId(null);
+      setActiveDeliveryLabel("");
+      setActiveCustomerPhone(null);
+      setActiveAddress("");
+    }
+
+    try {
+      const profile = await api.getRunnerProfile();
+      setRunnerDeliveries(profile.total_deliveries ?? 0);
+      setRunnerEarnings(profile.total_earnings ?? 0);
+    } catch {
+      setRunnerDeliveries(0);
+      setRunnerEarnings(0);
+    }
+  };
+
   useEffect(() => {
     if (!isLoggedIn) return;
     fetchAvailableOrders();
-    const interval = window.setInterval(fetchAvailableOrders, 15000);
+    refreshRunnerContext();
+    const interval = window.setInterval(() => {
+      fetchAvailableOrders();
+      refreshRunnerContext();
+    }, 15000);
     return () => window.clearInterval(interval);
   }, [isLoggedIn]);
 
@@ -172,16 +203,13 @@ export function RunnerMode() {
     setAcceptingOrderId(orderId);
     try {
       const response = await api.acceptOrder(orderId);
-      const order = availableOrders.find((item) => item.id === orderId);
-      if (order) {
-        setActiveDeliveries((previous) => [{ order, deliveryId: response.delivery_id, currentStatus: "assigned" }, ...previous]);
-      }
       setAvailableOrders((previous) => previous.filter((item) => (item.id || item.order_id) !== orderId));
       showToast(response.message || "Order accepted");
       localStorage.setItem("runner-open-delivery", response.delivery_id);
       window.dispatchEvent(new CustomEvent("runner:active-delivery-changed", {
         detail: { deliveryId: response.delivery_id },
       }));
+      await refreshRunnerContext();
       navigate(`/runner/delivery/${response.delivery_id}`, {
         state: {
           order: response.order,
@@ -202,74 +230,16 @@ export function RunnerMode() {
     }
   };
 
-  const pickupOrder = async (orderId: string) => {
-    try {
-      await api.pickupOrder(orderId);
-      setActiveDeliveries((previous) =>
-        previous.map((delivery) =>
-          delivery.order.id === orderId ? { ...delivery, currentStatus: "picked_up" } : delivery,
-        ),
-      );
-      showToast("Order picked up");
-    } catch (err: any) {
-      showToast(err.message || "Could not pick up order");
-    }
-  };
-
-  const markInTransit = async (orderId: string) => {
-    try {
-      await api.markInTransit(orderId);
-      setActiveDeliveries((previous) =>
-        previous.map((delivery) =>
-          delivery.order.id === orderId ? { ...delivery, currentStatus: "in_transit" } : delivery,
-        ),
-      );
-      showToast("Order is now in transit");
-    } catch (err: any) {
-      showToast(err.message || "Could not update order");
-    }
-  };
-
-  const requestOtp = async (orderId: string) => {
-    try {
-      const response = await api.deliverOrder(orderId);
-      setActiveDeliveries((previous) =>
-        previous.map((delivery) =>
-          delivery.order.id === orderId
-            ? { ...delivery, currentStatus: "awaiting_otp", otp: response.otp }
-            : delivery,
-        ),
-      );
-      showToast("Customer OTP requested");
-    } catch (err: any) {
-      showToast(err.message || "Could not request delivery OTP");
-    }
-  };
-
-  const confirmOtp = async (orderId: string) => {
-    try {
-      await api.confirmDelivery(orderId, otpInputs[orderId] || "");
-      const completed = activeDeliveries.find((delivery) => delivery.order.id === orderId);
-      setActiveDeliveries((previous) => previous.filter((delivery) => delivery.order.id !== orderId));
-      setOtpInputs((previous) => ({ ...previous, [orderId]: "" }));
-      if (completed) {
-        setCompletedCount((previous) => previous + 1);
-        setTotalEarnings((previous) => previous + (completed.order.reward_points || 10));
-      }
-      showToast("Delivery completed");
-    } catch (err: any) {
-      showToast(err.message || "Invalid OTP");
-    }
-  };
+  const activeCount = activeDeliveryId ? 1 : 0;
 
   const stats = useMemo(
     () => [
-      { label: "Completed Today", value: completedCount, color: "from-orange-500 to-red-500", icon: Bike },
-      { label: "Points Earned", value: totalEarnings, color: "from-green-500 to-emerald-600", icon: DollarSign },
-      { label: "Active Deliveries", value: activeCount, color: "from-blue-500 to-indigo-600", icon: TrendingUp },
-      { label: "Open Orders", value: availableOrders.length, color: "from-purple-500 to-fuchsia-600", icon: Bell },
+      { label: "Lifetime deliveries", value: runnerDeliveries, color: "from-orange-500 to-red-500", icon: Bike },
+      { label: "Total earnings", value: runnerEarnings, color: "from-green-500 to-emerald-600", icon: DollarSign },
+      { label: "Active delivery", value: activeCount, color: "from-blue-500 to-indigo-600", icon: TrendingUp },
+      { label: "Open orders", value: availableOrders.length, color: "from-purple-500 to-fuchsia-600", icon: Bell },
     ],
-    [activeCount, availableOrders.length, completedCount, totalEarnings],
+    [activeCount, availableOrders.length, runnerDeliveries, runnerEarnings],
   );
 
   if (!isLoggedIn) {
@@ -288,7 +258,7 @@ export function RunnerMode() {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8">
           <div>
             <h1 className="text-4xl font-bold text-gray-900">Runner Dashboard</h1>
-            <p className="text-gray-600 mt-2">Claim nearby orders, deliver fast, and keep the queue moving.</p>
+            <p className="text-gray-600 mt-2">Claim nearby orders, then use the delivery dashboard for pickup and drop-off.</p>
           </div>
           <button
             type="button"
@@ -361,81 +331,41 @@ export function RunnerMode() {
 
           <section>
             <div className="mb-4">
-              <h2 className="text-2xl font-bold text-gray-900">My Active Deliveries</h2>
-              <p className="text-sm text-gray-600 mt-1">Accepted orders move here so you can run pickup, transit, and OTP confirmation.</p>
+              <h2 className="text-2xl font-bold text-gray-900">Active delivery</h2>
+              <p className="text-sm text-gray-600 mt-1">Pickup, transit, and customer OTP all happen in one place.</p>
             </div>
 
-            <div className="space-y-4">
-              {activeDeliveries.length === 0 && (
-                <div className="rounded-2xl border border-orange-100 bg-white p-8 text-center text-gray-500">
-                  Your accepted orders will appear here.
+            {!activeDeliveryId ? (
+              <div className="rounded-2xl border border-orange-100 bg-white p-8 text-center text-gray-500">
+                When you accept an order, you’ll land in the delivery dashboard. Any in-progress delivery also appears here.
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-orange-100 bg-white p-5 shadow-md space-y-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-orange-500 font-semibold">In progress</p>
+                  <h3 className="text-xl font-bold text-gray-900 mt-2">Order {activeDeliveryLabel}</h3>
+                  <p className="text-sm text-gray-500 mt-1">{user?.name}</p>
                 </div>
-              )}
-
-              {activeDeliveries.map((delivery) => (
-                <div key={delivery.order.id} className="rounded-2xl border border-orange-100 bg-white p-5 shadow-md">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.2em] text-orange-500 font-semibold">Assigned Order</p>
-                      <h3 className="text-xl font-bold text-gray-900 mt-2">{delivery.order.order_number}</h3>
-                      <p className="text-sm text-gray-500 mt-1">{delivery.order.customer_name || user?.name}</p>
-                    </div>
-                    <div className="rounded-full bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-700">
-                      {delivery.currentStatus.replace("_", " ")}
-                    </div>
-                  </div>
-
-                  <div className="mt-4 space-y-3 text-sm">
-                    <p className="text-gray-700"><span className="font-semibold text-gray-900">Address:</span> {delivery.order.delivery_address}</p>
-                    {delivery.order.customer_phone && (
-                      <a href={`tel:${delivery.order.customer_phone}`} className="flex items-center gap-2 text-blue-600">
-                        <PhoneCall className="w-4 h-4" />
-                        {delivery.order.customer_phone}
-                      </a>
-                    )}
-                  </div>
-
-                  <div className="mt-5 grid grid-cols-1 gap-3">
-                    <button type="button" onClick={() => navigate(`/runner/delivery/${delivery.deliveryId || delivery.order.id}`, { state: { order_id: delivery.order.id } })} className="rounded-xl bg-gray-900 px-4 py-3 text-white font-semibold">
-                      Open Delivery Dashboard
-                    </button>
-                    {delivery.currentStatus === "assigned" && (
-                      <button type="button" onClick={() => pickupOrder(delivery.order.id)} className="rounded-xl bg-gradient-to-r from-orange-500 to-red-500 px-4 py-3 text-white font-semibold">
-                        Mark Picked Up
-                      </button>
-                    )}
-                    {delivery.currentStatus === "picked_up" && (
-                      <button type="button" onClick={() => markInTransit(delivery.order.id)} className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 px-4 py-3 text-white font-semibold">
-                        Mark In Transit
-                      </button>
-                    )}
-                    {delivery.currentStatus === "in_transit" && (
-                      <button type="button" onClick={() => requestOtp(delivery.order.id)} className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 px-4 py-3 text-white font-semibold">
-                        Request Delivery OTP
-                      </button>
-                    )}
-                    {delivery.currentStatus === "awaiting_otp" && (
-                      <div className="space-y-3">
-                        <input
-                          type="text"
-                          maxLength={6}
-                          value={otpInputs[delivery.order.id] || ""}
-                          onChange={(event) => setOtpInputs((previous) => ({ ...previous, [delivery.order.id]: event.target.value }))}
-                          placeholder="Enter 6-digit OTP"
-                          className="w-full rounded-xl border border-orange-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-300"
-                        />
-                        <button type="button" onClick={() => confirmOtp(delivery.order.id)} className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 px-4 py-3 text-white font-semibold">
-                          Confirm Delivery
-                        </button>
-                        {delivery.otp && (
-                          <p className="text-xs text-gray-500">Demo OTP: {delivery.otp}</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+                {activeAddress && (
+                  <p className="text-sm text-gray-700">
+                    <span className="font-semibold text-gray-900">Drop-off:</span> {activeAddress}
+                  </p>
+                )}
+                {activeCustomerPhone && (
+                  <a href={`tel:${activeCustomerPhone}`} className="inline-flex items-center gap-2 text-sm text-blue-600 font-medium">
+                    <PhoneCall className="w-4 h-4" />
+                    {activeCustomerPhone}
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => navigate(`/runner/delivery/${activeDeliveryId}`)}
+                  className="w-full rounded-xl bg-gray-900 px-4 py-3 text-white font-semibold"
+                >
+                  Open delivery dashboard
+                </button>
+              </div>
+            )}
           </section>
         </div>
       </div>
