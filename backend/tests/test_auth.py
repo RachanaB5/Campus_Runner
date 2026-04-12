@@ -13,9 +13,9 @@ def test_register_creates_unverified_user_and_otp(client):
 
     assert response.status_code == 201
     payload = response.get_json()
-
-    # Flexible message (works in CI + local)
     assert payload["message"].startswith("User registered successfully")
+    assert payload.get("requires_verification") is True
+    assert "access_token" not in payload
     assert payload["user"]["is_verified"] is False
 
     user = User.query.filter_by(email=email).first()
@@ -46,7 +46,8 @@ def test_verify_otp_marks_user_verified(client):
     })
 
     assert response.status_code == 200
-
+    verified = response.get_json()
+    assert verified.get("access_token")
     user = User.query.filter_by(email=email).first()
     assert user.is_verified is True
 

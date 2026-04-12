@@ -3,6 +3,7 @@ import { Award, Bike, CreditCard, LogOut, Mail, Phone, ShoppingBag, User } from 
 import { useAuth } from "../context/AuthContext";
 import { api, API_BASE_URL, getToken } from "../services/api";
 import { useNavigate } from "react-router";
+import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 
 const defaultPreferences = {
   order_updates: true,
@@ -145,7 +146,7 @@ export function Profile() {
           <div className="flex items-end gap-4 -mt-16 mb-6">
             <div className="w-32 h-32 bg-white rounded-full border-4 border-white shadow-lg overflow-hidden flex items-center justify-center">
               {profile?.avatar_url || profile?.profile_image ? (
-                <img src={profile.avatar_url || profile.profile_image} alt={profile?.name} className="h-full w-full object-cover" />
+                <ImageWithFallback src={profile.avatar_url || profile.profile_image} alt={profile?.name} className="h-full w-full object-cover" />
               ) : (
                 <User className="w-16 h-16 text-gray-400" />
               )}

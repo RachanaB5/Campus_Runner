@@ -19,9 +19,21 @@ print(f"📂 Looking for .env at: {dotenv_path}")
 print(f"📂 .env exists: {os.path.exists(dotenv_path)}")
 
 load_dotenv(dotenv_path)
+# Optional backend/.env: fills in vars missing from project root (e.g. MAIL_* only in backend/)
+backend_dotenv = os.path.join(backend_dir, '.env')
+if os.path.exists(backend_dotenv):
+    load_dotenv(backend_dotenv, override=False)
 
 # Create Flask app
 app = Flask(__name__)
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    v = os.getenv(name)
+    if v is None:
+        return default
+    return str(v).strip().lower() in ('1', 'true', 'yes', 'on')
+
 
 # Configuration
 database_url = os.getenv('DATABASE_URL', 'sqlite:///campusrunner.db')
@@ -40,11 +52,17 @@ _mail_user = (os.getenv('MAIL_USERNAME') or os.getenv('EMAIL_ADDRESS', '')).stri
 _mail_pass = (os.getenv('MAIL_PASSWORD') or os.getenv('EMAIL_PASSWORD', '')).replace(' ', '').strip()
 app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
 app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
-app.config['MAIL_USE_TLS'] = os.getenv('MAIL_USE_TLS', 'True') == 'True'
+app.config['MAIL_USE_TLS'] = _env_bool('MAIL_USE_TLS', True)
+app.config['MAIL_USE_SSL'] = _env_bool('MAIL_USE_SSL', False)
+app.config['MAIL_DEBUG'] = _env_bool('MAIL_DEBUG', False)
+app.config['MAIL_TIMEOUT'] = int(os.getenv('MAIL_TIMEOUT', 30))
 app.config['MAIL_USERNAME'] = _mail_user
 app.config['MAIL_PASSWORD'] = _mail_pass
 _default_sender = (os.getenv('MAIL_DEFAULT_SENDER', '') or _mail_user or 'noreply@campusrunner.com').strip()
 app.config['MAIL_DEFAULT_SENDER'] = _default_sender
+# Never suppress sends in normal dev unless explicitly set (Flask-Mail defaults suppress to app.testing only)
+if 'MAIL_SUPPRESS_SEND' in os.environ:
+    app.config['MAIL_SUPPRESS_SEND'] = _env_bool('MAIL_SUPPRESS_SEND', False)
 
 # Initialize extensions
 from models import db
@@ -665,12 +683,18 @@ def test_email():
         </html>
         """
         
-        from utils import send_email_in_background
-        send_email_in_background(app, "Campus Runner - Test Email", [recipient], html)
-        
+        from utils import send_otp_email_sync
+        sent, error = send_otp_email_sync(
+            app,
+            "Campus Runner - Test Email",
+            [recipient],
+            html,
+            otp_for_log=None,
+        )
         return jsonify({
-            'success': True,
-            'message': f'Test email queued to {recipient}',
+            'success': sent,
+            'message': (f"Test email sent to {recipient}" if sent else f"Test email could not be sent to {recipient}"),
+            'error': error,
             'config': {
                 'mail_server': app.config.get('MAIL_SERVER'),
                 'mail_port': app.config.get('MAIL_PORT'),

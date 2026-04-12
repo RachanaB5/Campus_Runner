@@ -70,15 +70,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    try {
-      const data = await authAPI.login(email, password);
-      if (data.access_token) {
-        setToken(data.access_token);
-        setUser(data.user);
-        setIsLoggedIn(true);
-      }
-    } catch (error) {
-      throw error;
+    const data = await authAPI.login(email, password);
+    if (data.access_token) {
+      setToken(data.access_token);
+      setUser(data.user);
+      setIsLoggedIn(true);
     }
   };
 
@@ -130,12 +126,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const updateProfile = async (data: Partial<User>) => {
-    try {
-      const response = await authAPI.updateProfile(data as any);
-      setUser(response.user);
-    } catch (error) {
-      throw error;
-    }
+    const response = await authAPI.updateProfile(data as any);
+    setUser(response.user);
   };
 
   const updateUser = (data: Partial<User>) => {

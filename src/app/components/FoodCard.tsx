@@ -5,6 +5,7 @@ import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { useState } from "react";
 import { useNavigate } from "react-router";
+import { getFoodImageUrl } from "../utils/foodImages";
 
 interface FoodCardProps {
   item: MenuItem;
@@ -49,7 +50,7 @@ export function FoodCard({ item, onAddSuccess, onOpenDetail }: FoodCardProps) {
       {/* Image */}
       <div className="relative overflow-hidden h-44 flex-shrink-0">
         <ImageWithFallback
-          src={item.image}
+          src={getFoodImageUrl(item.image, item.category)}
           alt={item.name}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
         />

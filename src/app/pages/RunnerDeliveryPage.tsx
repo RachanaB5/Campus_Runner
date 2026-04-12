@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { api } from "../services/api";
+import { ImageWithFallback } from "../components/figma/ImageWithFallback";
+import { getFoodImageUrl } from "../utils/foodImages";
 
 function OtpBoxes({ value }: { value: string }) {
   const digits = (value || "").split("").slice(0, 4);
@@ -119,7 +121,7 @@ export function RunnerDeliveryPage() {
                 {details.items?.map((item: any) => (
                   <div key={`${item.food_id}-${item.name}`} className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                      <img src={item.image_url} alt={item.name} className="h-14 w-14 rounded-xl object-cover" />
+                      <ImageWithFallback src={getFoodImageUrl(item.image_url, item.category)} alt={item.name} className="h-14 w-14 rounded-xl object-cover" />
                       <div>
                         <p className="font-semibold text-gray-900">{item.name}</p>
                         <p className="text-sm text-gray-500">× {item.quantity} {item.customizations ? `• ${item.customizations}` : ""}</p>

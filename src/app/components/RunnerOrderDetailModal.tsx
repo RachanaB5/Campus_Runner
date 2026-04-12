@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { PhoneCall, X } from "lucide-react";
 import { api } from "../services/api";
+import { ImageWithFallback } from "./figma/ImageWithFallback";
+import { getFoodImageUrl } from "../utils/foodImages";
 
 interface RunnerOrderDetailModalProps {
   orderId: string | null;
@@ -66,7 +68,7 @@ export function RunnerOrderDetailModal({ orderId, open, previewOnly = false, onC
                 <div className="space-y-3">
                   {details.items?.map((item: any) => (
                     <div key={`${item.food_id}-${item.name}`} className="flex items-center gap-3">
-                      {item.image_url && <img src={item.image_url} alt={item.name} className="h-14 w-14 rounded-xl object-cover" />}
+                      <ImageWithFallback src={getFoodImageUrl(item.image_url, item.category)} alt={item.name} className="h-14 w-14 rounded-xl object-cover" />
                       <div className="flex-1">
                         <p className="font-semibold text-gray-900">{item.name} × {item.quantity}</p>
                         {item.customizations && <p className="text-sm text-gray-500">{item.customizations}</p>}

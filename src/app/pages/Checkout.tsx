@@ -4,8 +4,7 @@ import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { 
   AlertCircle, MapPin, Phone, Truck, CheckCircle2, 
-  ArrowLeft, Loader, Clock, MapIcon, DollarSign, 
-  Shield, Zap, ChevronRight, Info
+  ArrowLeft, Shield, ChevronRight, Info
 } from "lucide-react";
 import { api, paymentAPI } from "../services/api";
 import { PaymentMethodSelector } from "../components/PaymentMethodSelector";
@@ -28,7 +27,7 @@ interface ValidationErrors {
 
 export function Checkout() {
   const navigate = useNavigate();
-  const { cart, getTotalPrice, clearCart, isLoading: cartLoading } = useCart();
+  const { cart, getTotalPrice, clearCart } = useCart();
   const { user } = useAuth();
   
   // Form state
@@ -42,8 +41,6 @@ export function Checkout() {
   // UI state
   const [isLoading, setIsLoading] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const [showConfirmation, setShowConfirmation] = useState(false);
-  const [orderData, setOrderData] = useState<any>(null);
   const [savedMethods, setSavedMethods] = useState<any[]>([]);
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
   const [validationState, setValidationState] = useState<ValidationState>({
@@ -306,7 +303,7 @@ export function Checkout() {
     }
   };
 
-  if (cartItems.length === 0 && !showConfirmation) {
+  if (cartItems.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-12 px-4">
         <div className="max-w-2xl mx-auto">
@@ -335,10 +332,6 @@ export function Checkout() {
         </div>
       </div>
     );
-  }
-
-  if (showConfirmation && orderData) {
-    return <OrderConfirmation orderData={orderData} navigate={navigate} />;
   }
 
   return (
@@ -650,113 +643,6 @@ export function Checkout() {
                 <span className="text-sm font-semibold">Secure Payment</span>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Order Confirmation Component
-function OrderConfirmation({ orderData, navigate }: any) {
-  const estimatedDelivery = orderData.estimated_delivery 
-    ? new Date(orderData.estimated_delivery).toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      })
-    : 'N/A';
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 py-12 px-4 flex items-center justify-center">
-      <div className="max-w-md mx-auto">
-        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-          {/* Success Header */}
-          <div className="bg-gradient-to-r from-green-500 to-green-600 p-8 text-center text-white">
-            <div className="w-20 h-20 mx-auto mb-4 bg-white rounded-full flex items-center justify-center animate-bounce">
-              <CheckCircle2 className="w-12 h-12 text-green-600" />
-            </div>
-            <h1 className="text-3xl font-bold">Order Confirmed!</h1>
-            <p className="text-green-100 mt-2">Your meal is on the way</p>
-          </div>
-
-          {/* Order Details */}
-          <div className="p-8 space-y-6">
-            {/* Order Number */}
-            <div className="text-center">
-              <p className="text-gray-600 text-sm mb-1">Order Number</p>
-              <p className="text-3xl font-bold text-gray-900">{orderData.order_number}</p>
-            </div>
-
-            {/* Status */}
-            <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg p-4 text-center border border-orange-200">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <Clock className="w-5 h-5 text-orange-600" />
-                <span className="font-semibold text-orange-900">Estimated Delivery</span>
-              </div>
-              <p className="text-2xl font-bold text-orange-600">{estimatedDelivery}</p>
-            </div>
-
-            {/* Delivery Address */}
-            <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-              <div className="flex items-start gap-3">
-                <MapPin className="w-5 h-5 text-blue-600 flex-shrink-0 mt-1" />
-                <div>
-                  <p className="font-semibold text-gray-900">Delivery Address</p>
-                  <p className="text-sm text-gray-700 mt-1">{orderData.order.delivery_address}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Order Items Summary */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <p className="font-semibold text-gray-900 mb-3">Items in Your Order</p>
-              <div className="space-y-2 max-h-32 overflow-y-auto">
-                {orderData.order.items?.map((item: any, idx: number) => (
-                  <div key={idx} className="flex justify-between text-sm text-gray-700">
-                    <span>{item.quantity}x {item.food_name}</span>
-                    <span className="font-medium">₹{item.total_price.toFixed(2)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Total */}
-            <div className="border-t-2 pt-4">
-              <div className="flex justify-between items-center">
-                <span className="text-xl font-bold text-gray-900">Total Amount</span>
-                <span className="text-2xl font-bold text-green-600">₹{orderData.order.total_amount.toFixed(2)}</span>
-              </div>
-            </div>
-
-            {/* Confirmation Info */}
-            <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-              <p className="text-sm text-blue-900">
-                ✓ A confirmation email has been sent to your registered email address. You can track your order status anytime.
-              </p>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="space-y-3 pt-4">
-              <button
-                onClick={() => navigate('/orders')}
-                className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-3 rounded-lg transition-all hover:shadow-lg flex items-center justify-center gap-2"
-              >
-                <Truck className="w-5 h-5" />
-                Track Order
-              </button>
-              <button
-                onClick={() => navigate('/')}
-                className="w-full bg-gray-200 hover:bg-gray-300 text-gray-900 font-bold py-3 rounded-lg transition-all"
-              >
-                Continue Shopping
-              </button>
-            </div>
-
-            {/* Info Message */}
-            <p className="text-center text-sm text-gray-600">
-              Choose an option above to continue, or close this page anytime.
-            </p>
           </div>
         </div>
       </div>
