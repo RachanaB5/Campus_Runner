@@ -13,7 +13,11 @@ class Delivery(db.Model):
     distance_km = db.Column(db.Float)
     delivery_fee = db.Column(db.Float)
     estimated_time_minutes = db.Column(db.Integer)
+    accepted_at = db.Column(db.DateTime)
+    picked_at = db.Column(db.DateTime)
+    on_the_way_at = db.Column(db.DateTime)
     actual_delivery_time = db.Column(db.DateTime)
+    delivered_at = db.Column(db.DateTime)
     rating = db.Column(db.Float)
     review = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -33,7 +37,11 @@ class Delivery(db.Model):
             'distance_km': self.distance_km,
             'delivery_fee': self.delivery_fee,
             'estimated_time_minutes': self.estimated_time_minutes,
+            'accepted_at': self.accepted_at.isoformat() if self.accepted_at else None,
+            'picked_at': self.picked_at.isoformat() if self.picked_at else None,
+            'on_the_way_at': self.on_the_way_at.isoformat() if self.on_the_way_at else None,
             'actual_delivery_time': self.actual_delivery_time.isoformat() if self.actual_delivery_time else None,
+            'delivered_at': self.delivered_at.isoformat() if self.delivered_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'rating': self.rating,

@@ -15,7 +15,7 @@ export function Login() {
   const [isLoading, setIsLoading] = useState(false);
 
   const validateEmail = (email: string) => {
-    return email.endsWith("@rvu.edu.in");
+    return email.trim().toLowerCase().endsWith("@rvu.edu.in");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,15 +35,16 @@ export function Login() {
     setIsLoading(true);
 
     try {
+      const normalizedEmail = email.trim().toLowerCase();
       if (isLogin) {
-        await login(email, password);
+        await login(normalizedEmail, password);
       } else {
         if (!name.trim()) {
           setError("Name is required");
           setIsLoading(false);
           return;
         }
-        await register(name, email, password, phone);
+        await register(name.trim(), normalizedEmail, password, phone.trim());
       }
       navigate("/");
     } catch (err: any) {

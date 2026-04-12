@@ -71,6 +71,7 @@ class OrderItem(db.Model):
     quantity = db.Column(db.Integer, nullable=False)
     unit_price = db.Column(db.Float, nullable=False)
     total_price = db.Column(db.Float, nullable=False)
+    customizations = db.Column(db.Text)
     
     def to_dict(self):
         return {
@@ -80,4 +81,5 @@ class OrderItem(db.Model):
             'quantity': self.quantity,
             'unit_price': self.unit_price,
             'total_price': self.total_price,
+            'customizations': self.customizations,
         }

@@ -35,6 +35,7 @@ class CartItem(db.Model):
     food_id = db.Column(db.String(36), db.ForeignKey('foods.id'), nullable=False)
     quantity = db.Column(db.Integer, default=1, nullable=False)
     price = db.Column(db.Float, nullable=False)  # Price at time of adding to cart
+    customizations = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -49,6 +50,7 @@ class CartItem(db.Model):
             'food_name': self.food.name if self.food else None,
             'quantity': self.quantity,
             'price': self.price,
+            'customizations': self.customizations,
             'total': self.price * self.quantity,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()

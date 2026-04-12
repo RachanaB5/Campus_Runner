@@ -1,11 +1,14 @@
 import { Clock, CheckCircle, Package, Bike, Phone, MapPin, User } from "lucide-react";
 import { useState, useEffect } from "react";
+import { Link } from "react-router";
 import { api } from "../services/api";
+import { RateOrderSheet } from "../components/RateOrderSheet";
 
 export function Orders() {
   const [orders, setOrders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [ratingOrderId, setRatingOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchMyOrders();
@@ -110,6 +113,11 @@ export function Orders() {
                     <div className="text-right">
                       <p className="text-2xl font-bold text-gray-900">₹{Number(order.total_amount).toFixed(2)}</p>
                       <p className="text-sm text-green-600 font-medium">+{Math.floor(order.total_amount / 10)} pts</p>
+                      {order.has_unreviewed_items && (
+                        <button type="button" onClick={(e) => { e.stopPropagation(); setRatingOrderId(order.id); }} className="mt-2 rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700">
+                          Rate Order
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -227,9 +235,9 @@ export function Orders() {
 
                     {/* Actions */}
                     <div className="flex gap-3">
-                      <button className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg transition-colors font-medium">
-                        Reorder
-                      </button>
+                      <Link to={`/orders/${order.id}/track`} className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg transition-colors font-medium text-center">
+                        Track Order
+                      </Link>
                       <button className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded-lg transition-colors font-medium">
                         Help
                       </button>
@@ -247,6 +255,7 @@ export function Orders() {
           </div>
         )}
       </div>
+      <RateOrderSheet orderId={ratingOrderId} open={Boolean(ratingOrderId)} onClose={() => setRatingOrderId(null)} onSubmitted={fetchMyOrders} />
     </div>
   );
 }

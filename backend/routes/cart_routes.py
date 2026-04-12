@@ -34,6 +34,7 @@ def add_to_cart():
         
         food_id = data.get('food_id')
         quantity = data.get('quantity', 1)
+        customizations = data.get('customizations')
         
         if not food_id or quantity < 1:
             return jsonify({'error': 'Invalid food_id or quantity'}), 400
@@ -51,7 +52,7 @@ def add_to_cart():
             db.session.flush()  # Flush to get the cart ID if needed
         
         # Check if item already in cart
-        cart_item = CartItem.query.filter_by(cart_id=cart.id, food_id=food_id).first()
+        cart_item = CartItem.query.filter_by(cart_id=cart.id, food_id=food_id, customizations=customizations).first()
         
         if cart_item:
             # Update quantity
@@ -63,7 +64,8 @@ def add_to_cart():
                 cart_id=cart.id,
                 food_id=food_id,
                 quantity=quantity,
-                price=food.price
+                price=food.price,
+                customizations=customizations,
             )
             db.session.add(cart_item)
         
@@ -115,7 +117,7 @@ def remove_from_cart(item_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-@cart_bp.route('/item/<item_id>', methods=['PATCH'])
+@cart_bp.route('/item/<item_id>', methods=['PATCH', 'PUT'])
 @jwt_required()
 def update_cart_item(item_id):
     """Update cart item quantity"""
@@ -124,6 +126,7 @@ def update_cart_item(item_id):
         data = request.get_json()
         
         quantity = data.get('quantity')
+        customizations = data.get('customizations')
         if quantity is None or quantity < 1:
             return jsonify({'error': 'Invalid quantity'}), 400
         
@@ -137,6 +140,8 @@ def update_cart_item(item_id):
             return jsonify({'error': 'Unauthorized'}), 403
         
         cart_item.quantity = quantity
+        if customizations is not None:
+            cart_item.customizations = customizations
         
         # Update cart totals
         cart_items = CartItem.query.filter_by(cart_id=cart.id).all()

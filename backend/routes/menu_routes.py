@@ -1,9 +1,61 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, Food
+from models import db, Food, Review
 import uuid
 
 menu_bp = Blueprint('menu', __name__)
+
+CATEGORY_ALIASES = {
+    'biryani': ['Biryani', 'Biryanis'],
+    'biryanis': ['Biryani', 'Biryanis'],
+    'pizza': ['Pizzas', 'Pizza & Bread'],
+    'pizzas': ['Pizzas', 'Pizza & Bread'],
+    'beverages': ['Cold Drinks', 'Tea & Coffee', 'Other Drinks', 'Fresh Juices', 'Soda', 'Lassi', 'Smooth Drinks', 'Special Shakes', 'Paper Boat', 'Tropicana', 'Milk Shakes'],
+}
+
+COUNTER_MAP = {
+    'Biryanis': ('Biryani & Rice Counter', 3),
+    'Meals': ('Meals Counter', 1),
+    'North Indian': ('North Indian Counter', 2),
+    'Parathas': ('North Indian Counter', 2),
+    'Pizzas': ('Pizza Counter', 5),
+    'Pasta': ('Pasta Counter', 6),
+    'Rolls': ('Rolls & Wraps Counter', 4),
+    'Burgers': ('Fast Food Counter', 4),
+    'Combos': ('Combo Counter', 2),
+}
+
+
+def _food_detail_defaults(food):
+    category = food.category or 'Meals'
+    counter_name, counter_number = COUNTER_MAP.get(category, ('Main Counter', 1))
+    ingredients = [part.strip() for part in (food.ingredients or '').split(',') if part.strip()]
+    if not ingredients:
+        ingredients = [category, 'Campus spice mix', 'Fresh herbs']
+    return {
+        'ingredients': ingredients,
+        'calories': food.calories or int(float(food.price or 50) * 5),
+        'counter_number': food.counter_number or counter_number,
+        'counter_name': food.counter_name or counter_name,
+    }
+
+
+def _review_payload(review):
+    user_name = review.seeded_name if getattr(review, 'is_seeded', False) and review.seeded_name else (review.user.name if review.user else 'Campus User')
+    parts = user_name.split()
+    display_name = parts[0] if parts else 'Campus'
+    if len(parts) > 1:
+        display_name = f'{parts[0]} {parts[-1][0]}.'
+    return {
+        'review_id': review.id,
+        'user_initial': user_name[:1].upper(),
+        'user_name': display_name,
+        'rating': review.rating,
+        'comment': review.comment,
+        'created_at': review.created_at.isoformat() if review.created_at else None,
+        'order_id': review.order_id,
+        'is_seeded': getattr(review, 'is_seeded', False),
+    }
 
 @menu_bp.route('/all', methods=['GET'])
 def get_all_foods():
@@ -43,7 +95,9 @@ def search_foods():
 def get_foods_by_category(category):
     """Get foods by category"""
     try:
-        foods = Food.query.filter_by(category=category).all()
+        category_key = (category or '').strip()
+        normalized_aliases = CATEGORY_ALIASES.get(category_key.lower(), [category_key])
+        foods = Food.query.filter(Food.category.in_(normalized_aliases)).all()
         return jsonify({
             'foods': [food.to_dict() for food in foods]
         }), 200
@@ -57,11 +111,20 @@ def get_food_detail(food_id):
         food = Food.query.get(food_id)
         if not food:
             return jsonify({'error': 'Food not found'}), 404
-        return jsonify(food.to_dict()), 200
+        reviews = Review.query.filter_by(food_id=food_id).order_by(Review.created_at.desc()).all()
+        rating_distribution = {str(star): 0 for star in range(1, 6)}
+        for review in reviews:
+            rating_distribution[str(review.rating)] += 1
+        payload = food.to_dict()
+        payload.update(_food_detail_defaults(food))
+        payload['reviews'] = [_review_payload(review) for review in reviews[:10]]
+        payload['rating_distribution'] = rating_distribution
+        return jsonify(payload), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @menu_bp.route('/add', methods=['POST'])
+@menu_bp.route('', methods=['POST'])
 @jwt_required()
 def add_food():
     """Add new food item (admin only)"""
@@ -101,6 +164,7 @@ def add_food():
         return jsonify({'error': str(e)}), 500
 
 @menu_bp.route('/items/<food_id>', methods=['PUT'])
+@menu_bp.route('/<food_id>', methods=['PUT'])
 @jwt_required()
 def update_food(food_id):
     """Update food item (admin only)"""
@@ -149,6 +213,7 @@ def update_food(food_id):
         return jsonify({'error': str(e)}), 500
 
 @menu_bp.route('/items/<food_id>', methods=['DELETE'])
+@menu_bp.route('/<food_id>', methods=['DELETE'])
 @jwt_required()
 def delete_food(food_id):
     """Delete food item (admin only)"""
@@ -164,6 +229,8 @@ def delete_food(food_id):
         if not food:
             return jsonify({'error': 'Food not found'}), 404
         
+        from models import CartItem
+        CartItem.query.filter_by(food_id=food_id).delete(synchronize_session=False)
         db.session.delete(food)
         db.session.commit()
         

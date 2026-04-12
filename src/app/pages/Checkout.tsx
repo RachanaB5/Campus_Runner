@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
@@ -7,7 +7,8 @@ import {
   ArrowLeft, Loader, Clock, MapIcon, DollarSign, 
   Shield, Zap, ChevronRight, Info
 } from "lucide-react";
-import * as api from "../services/api";
+import { api, paymentAPI } from "../services/api";
+import { PaymentMethodSelector } from "../components/PaymentMethodSelector";
 
 interface ValidationState {
   address: boolean;
@@ -36,20 +37,21 @@ export function Checkout() {
   const [pincode, setPincode] = useState("");
   const [phone, setPhone] = useState(user?.phone || "");
   const [instructions, setInstructions] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "upi" | "card">("cod");
   
   // UI state
   const [isLoading, setIsLoading] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [orderData, setOrderData] = useState<any>(null);
+  const [savedMethods, setSavedMethods] = useState<any[]>([]);
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
   const [validationState, setValidationState] = useState<ValidationState>({
     address: false,
     city: false,
     pincode: false,
     phone: false,
-    payment: false,
+    payment: true,
   });
 
   const cartItems = cart?.items || [];
@@ -57,6 +59,12 @@ export function Checkout() {
   const taxes = Math.round(totalPrice * 0.05 * 100) / 100;
   const deliveryFee = totalPrice > 500 ? 0 : 50;
   const finalTotal = totalPrice + taxes + deliveryFee;
+
+  useEffect(() => {
+    api.getSavedPaymentMethods().then((response) => {
+      setSavedMethods(response.payment_methods || []);
+    }).catch(() => setSavedMethods([]));
+  }, []);
 
   // Real-time validation
   const validateAddress = (value: string) => {
@@ -110,14 +118,132 @@ export function Checkout() {
       validationState.city &&
       validationState.pincode &&
       validationState.phone &&
-      paymentMethod &&
+      Boolean(paymentMethod) &&
       cartItems.length > 0
     );
   };
 
-  const handleSubmitOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const loadRazorpayScript = async () => {
+    if ((window as any).Razorpay) {
+      return true;
+    }
+
+    return new Promise<boolean>((resolve) => {
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
+  const createOrderDraft = async () => {
+    const items = cartItems.map((item) => ({
+      food_id: item.food_id,
+      quantity: item.quantity,
+      price: item.price,
+      customizations: item.customizations,
+    }));
+
+    const response = await fetch(`${api.API_BASE_URL}/checkout/confirm`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${api.getToken()}`,
+      },
+      body: JSON.stringify({
+        items,
+        delivery_address: address,
+        delivery_city: city,
+        delivery_pincode: pincode,
+        customer_phone: phone,
+        delivery_instructions: instructions,
+        payment_method: paymentMethod,
+        subtotal: totalPrice,
+        tax_amount: taxes,
+        delivery_fee: deliveryFee,
+        final_total: finalTotal,
+      }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || data.message || "Failed to create order");
+    }
+
+    return response.json();
+  };
+
+  const openRazorpayCheckout = async (orderDraft: any, upiSession: any) => {
+    if (upiSession.mock_checkout) {
+      await paymentAPI.verifyUpi({
+        razorpay_order_id: upiSession.razorpay_order_id,
+        razorpay_payment_id: upiSession.mock_payment_id,
+        razorpay_signature: upiSession.mock_signature,
+      });
+      return;
+    }
+
+    const loaded = await loadRazorpayScript();
+    if (!loaded || !(window as any).Razorpay) {
+      throw new Error("Razorpay checkout could not be loaded");
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      const razorpay = new (window as any).Razorpay({
+        key: upiSession.razorpay_key_id,
+        amount: upiSession.amount,
+        currency: upiSession.currency,
+        order_id: upiSession.razorpay_order_id,
+        name: "CampusRunner",
+        description: `Order ${orderDraft.order_number}`,
+        image: "/logo.png",
+        prefill: {
+          name: user?.name || "",
+          email: user?.email || "",
+          contact: phone,
+        },
+        theme: { color: "#F97316" },
+        method: {
+          upi: true,
+          card: false,
+          netbanking: false,
+          wallet: false,
+        },
+        handler: async (response: any) => {
+          try {
+            await paymentAPI.verifyUpi({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            });
+            resolve();
+          } catch (error) {
+            reject(error);
+          }
+        },
+        modal: {
+          ondismiss: () => reject(new Error("Payment was cancelled")),
+        },
+      });
+
+      razorpay.open();
+    });
+  };
+
+  const handlePaymentSubmit = async (
+    method: "cod" | "upi" | "card",
+    payload: {
+      upi_id?: string;
+      card_number?: string;
+      card_holder_name?: string;
+      card_expiry?: string;
+      card_pin?: string;
+      saved_method_id?: string;
+    },
+  ) => {
     setSubmitError("");
+    setPaymentMethod(method);
 
     if (!isFormValid()) {
       setSubmitError("Please fill in all required fields correctly");
@@ -127,46 +253,54 @@ export function Checkout() {
     setIsLoading(true);
 
     try {
-      const items = cartItems.map((item) => ({
-        food_id: item.food_id,
-        quantity: item.quantity,
-        price: item.price,
-      }));
+      const draft = await createOrderDraft();
+      const orderId = draft.order?.id;
 
-      const response = await fetch(`${api.API_BASE_URL}/checkout/confirm`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${api.getToken()}`,
-        },
-        body: JSON.stringify({
-          items,
-          delivery_address: address,
-          delivery_city: city,
-          delivery_pincode: pincode,
-          customer_phone: phone,
-          delivery_instructions: instructions,
-          payment_method: paymentMethod,
-          subtotal: totalPrice,
-          tax_amount: taxes,
-          delivery_fee: deliveryFee,
-          final_total: finalTotal,
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || data.message || "Failed to place order");
+      if (!orderId) {
+        throw new Error("Order was created without an id");
       }
 
-      const data = await response.json();
-      
-      setOrderData(data);
-      setShowConfirmation(true);
-      
+      if (method === "cod") {
+        await paymentAPI.initiate({ order_id: orderId, method: "cod" });
+      } else if (method === "card") {
+        const cardResponse = await paymentAPI.initiate({
+          order_id: orderId,
+          method: "card",
+          saved_method_id: payload.saved_method_id,
+          card_number: payload.card_number,
+          card_holder_name: payload.card_holder_name,
+          card_expiry: payload.card_expiry,
+          card_pin: payload.card_pin,
+        });
+        localStorage.setItem("saved_card_meta", JSON.stringify({
+          card_last4: cardResponse.card_last4,
+          card_holder_name: payload.card_holder_name,
+          card_expiry: payload.card_expiry,
+        }));
+      } else {
+        const upiSession = await paymentAPI.initiate({
+          order_id: orderId,
+          method: "upi",
+          saved_method_id: payload.saved_method_id,
+          upi_id: payload.upi_id,
+        });
+        await openRazorpayCheckout(draft, upiSession);
+      }
+
       await clearCart();
+      navigate(`/orders/${draft.order_id || orderId}/track`, {
+        replace: true,
+        state: {
+          order_id: draft.order_id || orderId,
+          token_number: draft.token_number || draft.order_number,
+          delivery_otp: draft.delivery_otp,
+          pickup_otp: draft.pickup_otp,
+          items: cartItems,
+          total: finalTotal,
+        },
+      });
     } catch (err: any) {
-      setSubmitError(err.message || "Failed to place order. Please try again.");
+      setSubmitError(err.message || "Failed to complete payment. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -256,7 +390,7 @@ export function Checkout() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Form */}
           <div className="lg:col-span-2 space-y-6">
-            <form onSubmit={handleSubmitOrder} className="space-y-6">
+            <div className="space-y-6">
               {/* Delivery Address Section */}
               <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-8 border border-gray-100">
                 <div className="flex items-center gap-3 mb-6">
@@ -428,54 +562,13 @@ export function Checkout() {
                 </div>
               </div>
 
-              {/* Payment Method */}
-              <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-8 border border-gray-100">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                    <DollarSign className="w-6 h-6 text-orange-600" />
-                  </div>
-                  <h2 className="text-xl font-bold text-gray-900">Payment Method</h2>
-                </div>
-                
-                <div className="space-y-3">
-                  {[
-                    { id: "cash", label: "Cash on Delivery", icon: "💰", desc: "Pay when food arrives" },
-                    { id: "card", label: "Credit/Debit Card", icon: "💳", desc: "Secure online payment" },
-                    { id: "upi", label: "UPI/Digital Payment", icon: "📱", desc: "Fast & secure UPI" },
-                  ].map((method) => (
-                    <label
-                      key={method.id}
-                      className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                        paymentMethod === method.id
-                          ? 'border-orange-500 bg-orange-50'
-                          : 'border-gray-300 bg-gray-50 hover:border-orange-300'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="payment"
-                        value={method.id}
-                        checked={paymentMethod === method.id}
-                        onChange={(e) => {
-                          setPaymentMethod(e.target.value);
-                          setValidationState(prev => ({ ...prev, payment: true }));
-                        }}
-                        className="w-5 h-5 text-orange-500 accent-orange-500"
-                      />
-                      <span className="ml-4">
-                        <div className="text-lg">{method.icon}</div>
-                      </span>
-                      <div className="ml-3 flex-1">
-                        <div className="font-semibold text-gray-900">{method.label}</div>
-                        <div className="text-sm text-gray-600">{method.desc}</div>
-                      </div>
-                      {paymentMethod === method.id && (
-                        <CheckCircle2 className="w-5 h-5 text-orange-600" />
-                      )}
-                    </label>
-                  ))}
-                </div>
-              </div>
+              <PaymentMethodSelector
+                amount={finalTotal}
+                isLoading={isLoading}
+                disabled={!isFormValid()}
+                savedMethods={savedMethods}
+                onSubmit={handlePaymentSubmit}
+              />
 
               {/* Error Message */}
               {submitError && (
@@ -488,29 +581,7 @@ export function Checkout() {
                 </div>
               )}
 
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={isLoading || !isFormValid()}
-                className={`w-full py-4 rounded-lg font-bold text-lg transition-all flex items-center justify-center gap-2 ${
-                  isFormValid()
-                    ? 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg hover:shadow-xl'
-                    : 'bg-gray-300 text-gray-600 cursor-not-allowed'
-                }`}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader className="w-5 h-5 animate-spin" />
-                    Placing Order...
-                  </>
-                ) : (
-                  <>
-                    <Zap className="w-5 h-5" />
-                    Place Order - ₹{finalTotal.toFixed(2)}
-                  </>
-                )}
-              </button>
-            </form>
+            </div>
           </div>
 
           {/* Order Summary Sidebar */}

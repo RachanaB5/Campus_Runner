@@ -12,5 +12,9 @@ from models.token import Token
 from models.cart import Cart, CartItem
 from models.checkout import Checkout
 from models.otp import OrderOTP
+from models.payment import Payment
+from models.saved_payment_method import SavedPaymentMethod
+from models.notification import Notification
+from models.review import Review
 
-__all__ = ['db', 'User', 'Food', 'Order', 'OrderItem', 'Delivery', 'Runner', 'RewardPoints', 'RewardTransaction', 'Token', 'Cart', 'CartItem', 'Checkout', 'OrderOTP']
+__all__ = ['db', 'User', 'Food', 'Order', 'OrderItem', 'Delivery', 'Runner', 'RewardPoints', 'RewardTransaction', 'Token', 'Cart', 'CartItem', 'Checkout', 'OrderOTP', 'Payment', 'SavedPaymentMethod', 'Notification', 'Review']

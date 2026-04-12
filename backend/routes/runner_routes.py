@@ -1,10 +1,72 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, User, Runner, Delivery, Order
+from models import db, User, Runner, Delivery, Order, OrderOTP, RewardPoints, RewardTransaction
 from datetime import datetime
 import uuid
+from sqlalchemy import select
+
+from services.notification_service import notify_order_taken
 
 runner_bp = Blueprint('runner', __name__)
+
+
+def _format_customer_name(name: str | None) -> str:
+    if not name:
+        return 'Campus User'
+    parts = name.split()
+    if len(parts) == 1:
+        return parts[0]
+    return f'{parts[0]} {parts[-1][0]}.'
+
+
+def _build_delivery_address(full_address: str | None) -> dict:
+    parts = [part.strip() for part in (full_address or '').split(',') if part.strip()]
+    return {
+        'hostel': parts[0] if len(parts) > 0 else '',
+        'room': parts[1] if len(parts) > 1 else '',
+        'landmark': parts[2] if len(parts) > 2 else '',
+        'full_address': full_address or '',
+    }
+
+
+def _emit_order_status(order, new_status, runner_name=None):
+    try:
+        import app as app_module
+
+        if getattr(app_module, 'socketio', None):
+            app_module.socketio.emit('order_status_update', {
+                'order_id': order.id,
+                'status': new_status,
+                'updated_at': datetime.utcnow().isoformat(),
+                'runner_name': runner_name,
+            }, room=f'user:{order.customer_id}')
+    except Exception:
+        return
+
+
+def _reward_runner(user_id: str, order, points: int):
+    reward = RewardPoints.query.filter_by(user_id=user_id).first()
+    if not reward:
+        reward = RewardPoints(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            total_points=0,
+            points_balance=0,
+        )
+        db.session.add(reward)
+        db.session.flush()
+
+    reward.total_points += points
+    reward.points_balance += points
+    transaction = RewardTransaction(
+        id=str(uuid.uuid4()),
+        reward_points_id=reward.id,
+        order_id=order.id,
+        transaction_type='earned',
+        points=points,
+        description=f'Runner reward for delivering {order.order_number}',
+    )
+    db.session.add(transaction)
 
 @runner_bp.route('/register', methods=['POST'])
 @jwt_required()
@@ -28,7 +90,7 @@ def register_as_runner():
             user_id=user_id,
             vehicle_type=data.get('vehicle_type'),
             license_number=data.get('license_number'),
-            is_available=True,
+            is_available=False,
             status='offline'
         )
         
@@ -271,7 +333,7 @@ def rate_delivery(delivery_id):
 @runner_bp.route('/available-orders', methods=['GET'])
 @jwt_required()
 def get_available_orders():
-    """Get orders ready for pickup by runner"""
+    """Get new orders available for acceptance by online runners."""
     try:
         user_id = get_jwt_identity()
         runner = Runner.query.filter_by(user_id=user_id).first()
@@ -279,24 +341,332 @@ def get_available_orders():
         if not runner:
             return jsonify({'error': 'Runner profile not found'}), 404
         
-        # Get orders that are ready for pickup and don't have delivery yet
-        ready_orders = Order.query.filter_by(status='ready').all()
-        
+        candidate_orders = Order.query.filter(Order.status.in_(['confirmed', 'preparing', 'ready'])).order_by(Order.created_at.asc()).all()
+
         orders_data = []
-        for order in ready_orders:
-            if not order.delivery:  # Only show if no delivery assigned
-                order_dict = order.to_dict(include_items=True)
+        for order in candidate_orders:
+            delivery = order.delivery
+            if not delivery or not delivery.runner_id:
                 customer = User.query.get(order.customer_id)
-                order_dict['customer_name'] = customer.name if customer else 'Unknown'
-                order_dict['customer_phone'] = order.customer_phone
-                orders_data.append(order_dict)
-        
+                if customer and customer.name:
+                    name_parts = customer.name.strip().split()
+                    customer_display = name_parts[0] + (f" {name_parts[-1][0]}." if len(name_parts) > 1 else "")
+                else:
+                    customer_display = 'Unknown'
+                items = []
+                for item in order.items or []:
+                    food = item.food
+                    items.append({
+                        'food_id': item.food_id,
+                        'name': food.name if food else 'Unknown Item',
+                        'quantity': item.quantity,
+                        'unit_price': float(item.unit_price or 0),
+                        'subtotal': float(item.total_price or (item.quantity * item.unit_price)),
+                        'is_veg': food.is_veg if food else True,
+                        'image_url': food.image_url if food else None,
+                        'customizations': item.customizations or '',
+                    })
+                first_food = order.items[0].food if order.items else None
+                counter_number = getattr(first_food, 'counter_number', None) if first_food else None
+                reward_points = max(10, int(round(float(order.total_amount or 0) * 0.1)))
+                orders_data.append({
+                    'id': order.id,
+                    'order_id': order.id,
+                    'token_number': order.order_number,
+                    'customer_name': customer_display,
+                    'placed_at': order.created_at.isoformat() if order.created_at else None,
+                    'item_count': len(items),
+                    'items': items,
+                    'items_preview': [entry['name'] for entry in items[:2]],
+                    'items_summary': [entry['name'] for entry in items[:3]],
+                    'subtotal': float(sum(entry['subtotal'] for entry in items)),
+                    'delivery_fee': float(order.delivery_fee or 0),
+                    'tax': max(0.0, round(float(order.total_amount or 0) - float(order.delivery_fee or 0) - float(sum(entry['subtotal'] for entry in items)), 2)),
+                    'total_amount': float(order.total_amount or 0),
+                    'payment_method': order.payment_method or 'N/A',
+                    'payment_status': order.payment_status or 'pending',
+                    'delivery_address': order.delivery_address or 'On-campus pickup',
+                    'special_instructions': order.special_instructions or '',
+                    'counter_number': counter_number,
+                    'pickup_location': f'Counter {counter_number}' if counter_number else 'Campus kitchen',
+                    'reward_points': reward_points,
+                    'status': order.status,
+                })
+
         return jsonify({
+            'orders': orders_data,
             'available_orders': orders_data,
             'count': len(orders_data)
         }), 200
     
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@runner_bp.route('/accept/<order_id>', methods=['POST'])
+@jwt_required()
+def accept_order(order_id):
+    """Assign an order to the current runner using row locking."""
+    try:
+        user_id = get_jwt_identity()
+        runner = Runner.query.filter_by(user_id=user_id).first()
+
+        if not runner:
+            return jsonify({'error': 'Runner profile not found'}), 404
+
+        delivery = Delivery.query.filter_by(order_id=order_id).first()
+        if not delivery:
+            return jsonify({'error': 'Delivery not found'}), 404
+
+        locked_order = db.session.execute(
+            select(Order)
+            .where(Order.id == order_id, Order.status.in_(['confirmed', 'ready']))
+            .with_for_update(skip_locked=True)
+        ).scalar_one_or_none()
+
+        if not locked_order:
+            return jsonify({'error': 'Order already accepted by another runner'}), 409
+
+        current_delivery = Delivery.query.filter_by(order_id=order_id).first()
+        if current_delivery and current_delivery.runner_id:
+            return jsonify({'error': 'Order already accepted by another runner'}), 409
+
+        current_delivery.runner_id = user_id
+        current_delivery.status = 'assigned'
+        current_delivery.accepted_at = datetime.utcnow()
+        runner.status = 'on_delivery'
+        locked_order.status = 'ready' if locked_order.status == 'ready' else 'confirmed'
+        db.session.commit()
+
+        notify_order_taken(locked_order, runner_user=User.query.get(user_id))
+        pickup_otp = OrderOTP.query.filter_by(order_id=locked_order.id, delivery_id=current_delivery.id, otp_type='pickup').order_by(OrderOTP.created_at.desc()).first()
+
+        return jsonify({
+            'success': True,
+            'message': 'Order accepted successfully',
+            'order': locked_order.to_dict(),
+            'delivery_id': current_delivery.id,
+            'pickup_otp': pickup_otp.otp if pickup_otp else None,
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@runner_bp.route('/order/<order_id>/details', methods=['GET'])
+@jwt_required()
+def get_runner_order_details(order_id):
+    try:
+        user_id = get_jwt_identity()
+        runner = Runner.query.filter_by(user_id=user_id).first()
+        if not runner:
+            return jsonify({'error': 'Runner profile not found'}), 404
+
+        order = Order.query.get(order_id)
+        if not order:
+            return jsonify({'error': 'Order not found'}), 404
+
+        delivery = Delivery.query.filter_by(order_id=order.id).first()
+        if not delivery:
+            return jsonify({'error': 'Delivery not found'}), 404
+        if delivery.runner_id and delivery.runner_id != user_id:
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        subtotal = sum(item.total_price for item in (order.items or []))
+        tax = max(0.0, round(float(order.total_amount or 0) - float(order.delivery_fee or 0) - float(subtotal or 0), 2))
+        first_food = order.items[0].food if order.items else None
+        counter_number = getattr(first_food, 'counter_number', None) or 1
+        counter_name = getattr(first_food, 'counter_name', None) or 'Main Counter'
+        pickup_otp = OrderOTP.query.filter_by(order_id=order.id, delivery_id=delivery.id, otp_type='pickup').order_by(OrderOTP.created_at.desc()).first()
+        delivery_otp = OrderOTP.query.filter_by(order_id=order.id, delivery_id=delivery.id, otp_type='delivery').order_by(OrderOTP.created_at.desc()).first()
+        customer = User.query.get(order.customer_id)
+
+        return jsonify({
+            'order_id': order.id,
+            'delivery_id': delivery.id,
+            'token_number': order.order_number,
+            'placed_at': order.created_at.isoformat() if order.created_at else None,
+            'estimated_prep_time': delivery.estimated_time_minutes or 18,
+            'payment_method': order.payment_method,
+            'payment_status': order.payment_status,
+            'total_amount': order.total_amount,
+            'subtotal': subtotal,
+            'delivery_fee': order.delivery_fee,
+            'tax': tax,
+            'special_instructions': order.special_instructions,
+            'delivery_address': _build_delivery_address(order.delivery_address),
+            'counter_number': counter_number,
+            'counter_name': counter_name,
+            'items': [{
+                'food_id': item.food_id,
+                'name': item.food.name if item.food else 'Item',
+                'quantity': item.quantity,
+                'unit_price': item.unit_price,
+                'subtotal': item.total_price,
+                'is_veg': item.food.is_veg if item.food else True,
+                'image_url': item.food.image_url if item.food else None,
+                'customizations': item.customizations,
+            } for item in (order.items or [])],
+            'runner_reward_points': max(10, int(round(float(order.total_amount or 0) / 15))),
+            'customer_name': _format_customer_name(customer.name if customer else None),
+            'customer_initial': (customer.name[:1].upper() if customer and customer.name else 'C'),
+            'customer_phone': customer.phone if customer and delivery.status in ['picked_up', 'on_the_way', 'delivered'] else None,
+            'pickup_otp': pickup_otp.otp if pickup_otp else None,
+            'delivery_otp': delivery_otp.otp if delivery_otp else None,
+            'delivery_status': delivery.status,
+            'runner_stats': {
+                'deliveries_made': runner.total_deliveries or 0,
+            },
+            'timeline': {
+                'accepted_at': delivery.accepted_at.isoformat() if delivery.accepted_at else None,
+                'picked_at': delivery.picked_at.isoformat() if delivery.picked_at else None,
+                'on_the_way_at': delivery.on_the_way_at.isoformat() if delivery.on_the_way_at else None,
+                'delivered_at': delivery.delivered_at.isoformat() if delivery.delivered_at else None,
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@runner_bp.route('/delivery/<delivery_id>/details', methods=['GET'])
+@jwt_required()
+def get_runner_delivery_details(delivery_id):
+    try:
+        user_id = get_jwt_identity()
+        delivery = Delivery.query.get(delivery_id)
+        if not delivery:
+            return jsonify({'error': 'Delivery not found'}), 404
+        if delivery.runner_id and delivery.runner_id != user_id:
+            return jsonify({'error': 'Unauthorized'}), 403
+        return get_runner_order_details(delivery.order_id)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@runner_bp.route('/active-delivery', methods=['GET'])
+@jwt_required()
+def get_active_delivery():
+    try:
+        user_id = get_jwt_identity()
+        runner = Runner.query.filter_by(user_id=user_id).first()
+        if not runner:
+            return jsonify({'active': False}), 200
+
+        delivery = Delivery.query.filter(
+            Delivery.runner_id == user_id,
+            Delivery.status.in_(['assigned', 'picked_up', 'on_the_way'])
+        ).order_by(Delivery.created_at.desc()).first()
+
+        if not delivery:
+            return jsonify({'active': False}), 200
+
+        order = Order.query.get(delivery.order_id)
+        if not order:
+            return jsonify({'active': False}), 200
+
+        details_response = get_runner_order_details(order.id)
+        if isinstance(details_response, tuple):
+            payload, status = details_response
+            if status != 200:
+                return jsonify({'active': False}), 200
+            details = payload.get_json()
+        else:
+            details = details_response.get_json()
+
+        return jsonify({
+            'active': True,
+            'delivery_id': delivery.id,
+            'delivery_status': delivery.status,
+            'details': details,
+            'order': {
+                'id': order.id,
+                'token_number': order.order_number,
+                'total_amount': float(order.total_amount or 0),
+                'payment_method': order.payment_method,
+                'payment_status': order.payment_status,
+                'special_instructions': order.special_instructions or '',
+                'delivery_address': order.delivery_address,
+                'items': details.get('items', []),
+                'item_count': len(details.get('items', [])),
+            },
+            'customer_name': details.get('customer_name'),
+            'customer_phone': details.get('customer_phone'),
+            'pickup_otp': details.get('pickup_otp'),
+            'reward_points': details.get('runner_reward_points'),
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@runner_bp.route('/delivery/<delivery_id>/status', methods=['PUT'])
+@jwt_required()
+def update_delivery_status_v2(delivery_id):
+    try:
+        user_id = get_jwt_identity()
+        runner = Runner.query.filter_by(user_id=user_id).first()
+        if not runner:
+            return jsonify({'error': 'Runner profile not found'}), 404
+
+        delivery = Delivery.query.get(delivery_id)
+        if not delivery or delivery.runner_id != user_id:
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        order = Order.query.get(delivery.order_id)
+        if not order:
+            return jsonify({'error': 'Order not found'}), 404
+
+        data = request.get_json() or {}
+        new_status = data.get('status')
+        otp_code = str(data.get('otp') or '').strip()
+        runner_name = User.query.get(user_id).name if User.query.get(user_id) else None
+
+        if new_status == 'picked_up':
+            pickup_otp = OrderOTP.query.filter_by(order_id=order.id, delivery_id=delivery.id, otp_type='pickup').order_by(OrderOTP.created_at.desc()).first()
+            if pickup_otp and not pickup_otp.is_verified:
+                pickup_otp.is_verified = True
+                pickup_otp.verified_at = datetime.utcnow()
+            delivery.status = 'picked_up'
+            delivery.picked_at = datetime.utcnow()
+            order.status = 'picked_up'
+            order.picked_up_at = datetime.utcnow()
+            _emit_order_status(order, 'picked_up', runner_name)
+        elif new_status == 'assigned':
+            delivery.status = 'assigned'
+            order.status = 'confirmed'
+        elif new_status == 'on_the_way':
+            delivery.status = 'on_the_way'
+            delivery.on_the_way_at = datetime.utcnow()
+            order.status = 'on_the_way'
+            order.in_transit_at = datetime.utcnow()
+            _emit_order_status(order, 'on_the_way', runner_name)
+        elif new_status == 'delivered':
+            delivery_otp = OrderOTP.query.filter_by(order_id=order.id, delivery_id=delivery.id, otp_type='delivery').order_by(OrderOTP.created_at.desc()).first()
+            if not delivery_otp or delivery_otp.otp != otp_code:
+                return jsonify({'error': 'Invalid delivery OTP'}), 400
+            delivery_otp.is_verified = True
+            delivery_otp.verified_at = datetime.utcnow()
+            delivery.status = 'delivered'
+            delivery.delivered_at = datetime.utcnow()
+            delivery.actual_delivery_time = datetime.utcnow()
+            order.status = 'delivered'
+            order.delivered_at = datetime.utcnow()
+            runner.total_deliveries = (runner.total_deliveries or 0) + 1
+            runner.status = 'online'
+            reward_points = max(10, int(round(float(order.total_amount or 0) / 15)))
+            _reward_runner(user_id, order, reward_points)
+            _emit_order_status(order, 'delivered', runner_name)
+        else:
+            return jsonify({'error': 'Invalid status'}), 400
+
+        db.session.commit()
+        return jsonify({
+            'message': 'Delivery status updated',
+            'delivery': delivery.to_dict(),
+            'order': order.to_dict(),
+            'points_earned': max(10, int(round(float(order.total_amount or 0) / 15))) if new_status == 'delivered' else 0,
+        }), 200
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 
@@ -521,4 +891,3 @@ def confirm_delivery(order_id):
         db.session.rollback()
         print(f"❌ Confirmation error: {str(e)}")
         return jsonify({'error': str(e)}), 500
-

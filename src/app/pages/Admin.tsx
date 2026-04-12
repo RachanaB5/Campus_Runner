@@ -17,6 +17,33 @@ interface FoodItem {
   rating: number;
 }
 
+const DEFAULT_FOOD_IMAGES: Record<string, string> = {
+  meals: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop",
+  combos: "https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=400&h=300&fit=crop",
+  "north indian": "https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=400&h=300&fit=crop",
+  parathas: "https://images.unsplash.com/photo-1569050467447-ce54b3bbc37d?w=400&h=300&fit=crop",
+  rolls: "https://images.unsplash.com/photo-1626700051175-6818013e1d4f?w=400&h=300&fit=crop",
+  biryanis: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=400&h=300&fit=crop",
+  biryani: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=400&h=300&fit=crop",
+  burgers: "https://images.unsplash.com/photo-1550547660-d9450f859349?w=400&h=300&fit=crop",
+  maggi: "https://images.unsplash.com/photo-1612929633738-8fe44f7ec841?w=400&h=300&fit=crop",
+  pizzas: "https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=400&h=300&fit=crop",
+  beverages: "https://images.unsplash.com/photo-1544145945-f90425340c7e?w=400&h=300&fit=crop",
+  soda: "https://images.unsplash.com/photo-1544145945-f90425340c7e?w=400&h=300&fit=crop",
+  lassi: "https://images.unsplash.com/photo-1582735689369-e68a7d48b69e?w=400&h=300&fit=crop",
+  "milk shakes": "https://images.unsplash.com/photo-1572490122747-3968b75cc699?w=400&h=300&fit=crop",
+  "ice cream": "https://images.unsplash.com/photo-1501443762994-82bd5dace89a?w=400&h=300&fit=crop",
+  desserts: "https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=400&h=300&fit=crop",
+};
+
+const FALLBACK_FOOD_IMAGE =
+  "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop";
+
+const getFoodImageUrl = (food: FoodItem) =>
+  food.image_url?.trim() ||
+  DEFAULT_FOOD_IMAGES[food.category?.trim().toLowerCase()] ||
+  FALLBACK_FOOD_IMAGE;
+
 export function Admin() {
   const { isLoggedIn } = useAuth();
   const navigate = useNavigate();
@@ -123,7 +150,7 @@ export function Admin() {
       alert("Food item deleted successfully!");
     } catch (error) {
       console.error("Error deleting food:", error);
-      alert("Failed to delete food item. Please try again.");
+      alert(error instanceof Error ? error.message : "Failed to delete food item. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -328,20 +355,14 @@ export function Admin() {
             {foods.map((food) => (
               <div key={food.id} className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden">
                 <div className="h-40 bg-gray-200 relative">
-                  {food.image_url ? (
-                    <img
-                      src={food.image_url}
-                      alt={food.name}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop";
-                      }}
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center h-full bg-gray-300">
-                      <Package className="w-8 h-8 text-gray-600" />
-                    </div>
-                  )}
+                  <img
+                    src={getFoodImageUrl(food)}
+                    alt={food.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = FALLBACK_FOOD_IMAGE;
+                    }}
+                  />
                   <div className="absolute top-3 right-3 bg-white rounded-full px-3 py-1 shadow-lg">
                     <span className="text-sm font-semibold text-orange-600">₹{food.price}</span>
                   </div>

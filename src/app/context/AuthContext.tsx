@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from "react";
-import { authAPI, getToken, setToken, removeToken } from "../services/api";
+import { authAPI, getToken, setToken, removeToken, API_BASE_URL } from "../services/api";
+import { disconnectSocket } from "../services/socket";
 
 interface User {
   id: string;
@@ -8,7 +9,16 @@ interface User {
   phone?: string;
   role: string;
   profile_image?: string;
+  avatar_url?: string;
   wallet_balance: number;
+  member_since?: string;
+  notification_preferences?: Record<string, boolean>;
+  stats?: {
+    total_orders: number;
+    total_points: number;
+    lifetime_points: number;
+    deliveries_made: number;
+  };
 }
 
 interface AuthContextType {
@@ -19,6 +29,7 @@ interface AuthContextType {
   register: (name: string, email: string, password: string, phone?: string) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
+  updateUser: (data: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -78,13 +89,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
+      const token = getToken();
+      if (token) {
+        try {
+          await fetch(`${API_BASE_URL}/cart/clear`, {
+            method: "DELETE",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          });
+        } catch {
+          // Best-effort cart clear on logout
+        }
+      }
       await authAPI.logout();
     } catch {
       // Ignore errors on logout
     } finally {
+      disconnectSocket();
       removeToken();
       setIsLoggedIn(false);
       setUser(null);
+      window.dispatchEvent(new Event("auth:logout"));
     }
   };
 
@@ -97,8 +124,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateUser = (data: Partial<User>) => {
+    setUser((previous) => previous ? { ...previous, ...data } : previous);
+  };
+
   return (
-    <AuthContext.Provider value={{ isLoggedIn, user, isLoading, login, register, logout, updateProfile }}>
+    <AuthContext.Provider value={{ isLoggedIn, user, isLoading, login, register, logout, updateProfile, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

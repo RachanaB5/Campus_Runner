@@ -89,6 +89,7 @@ def validate_checkout():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@checkout_bp.route('', methods=['POST'])
 @checkout_bp.route('/confirm', methods=['POST'])
 @jwt_required()
 def confirm_checkout():
@@ -178,11 +179,16 @@ def confirm_checkout():
                 food_id=food.id,
                 quantity=quantity,
                 unit_price=unit_price,
-                total_price=total_price
+                total_price=total_price,
+                customizations=item.get('customizations')
             )
             order_items.append(order_item)
         
         # Create order
+        normalized_payment_method = (checkout.payment_method or '').strip().lower()
+        if normalized_payment_method == 'cash':
+            normalized_payment_method = 'cod'
+
         order = Order(
             id=str(uuid.uuid4()),
             customer_id=user_id,
@@ -192,8 +198,9 @@ def confirm_checkout():
             delivery_address=checkout.delivery_address,
             customer_phone=checkout.customer_phone,
             special_instructions=checkout.special_instructions,
-            status='confirmed',
-            payment_method=checkout.payment_method,
+            status='placed',
+            payment_status='pending',
+            payment_method=normalized_payment_method,
             estimated_delivery_time=datetime.utcnow() + timedelta(minutes=45)
         )
         
@@ -217,6 +224,13 @@ def confirm_checkout():
         db.session.add(order)
         db.session.add(delivery)
         db.session.add(checkout)
+        db.session.flush()
+
+        from models import OrderOTP
+        pickup_otp = OrderOTP.create_for_order(order.id, delivery.id, otp_type='pickup')
+        delivery_otp = OrderOTP.create_for_order(order.id, delivery.id, otp_type='delivery')
+        db.session.add(pickup_otp)
+        db.session.add(delivery_otp)
         db.session.commit()
         
         # Send confirmation emails (non-blocking)
@@ -254,9 +268,13 @@ def confirm_checkout():
         return jsonify({
             'success': True,
             'message': 'Order placed successfully',
+            'order_id': order.id,
+            'token_number': order.order_number,
             'order': order.to_dict(),
             'checkout': checkout.to_dict(),
             'order_number': order.order_number,
+            'pickup_otp': pickup_otp.otp,
+            'delivery_otp': delivery_otp.otp,
             'estimated_delivery': order.estimated_delivery_time.isoformat() if order.estimated_delivery_time else None
         }), 201
     

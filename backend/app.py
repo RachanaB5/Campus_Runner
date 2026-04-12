@@ -5,6 +5,7 @@ from flask_mail import Mail
 from dotenv import load_dotenv
 import os
 import sys
+from sqlalchemy import inspect, text
 
 # Ensure we're in the right directory
 backend_dir = os.path.dirname(os.path.abspath(__file__))
@@ -23,7 +24,13 @@ load_dotenv(dotenv_path)
 app = Flask(__name__)
 
 # Configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///campusrunner.db')
+database_url = os.getenv('DATABASE_URL', 'sqlite:///campusrunner.db')
+if database_url.startswith('sqlite:///') and not database_url.startswith('sqlite:////'):
+    database_name = database_url.replace('sqlite:///', '', 1)
+    database_path = os.path.join(parent_dir, 'instance', database_name)
+    os.makedirs(os.path.dirname(database_path), exist_ok=True)
+    database_url = f'sqlite:///{database_path}'
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your-secret-key-change-in-production')
 
@@ -42,14 +49,50 @@ db.init_app(app)
 # Improved CORS configuration
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173", "http://127.0.0.1:3000"],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "origins": [
+            "http://localhost:5173", 
+            "http://localhost:5174",
+            "http://localhost:3000",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:5174",
+            "http://127.0.0.1:3000",
+            "http://10.17.20.172:5173",
+            "http://10.17.20.172:5174",
+            "http://10.17.20.172:3000"
+        ],
+        "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
         "supports_credentials": True
     }
 })
 
 jwt = JWTManager(app)
+
+try:
+    from flask_socketio import SocketIO, join_room
+    socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+    from socketio_events import register_socketio_events
+
+    @socketio.on('join_user_room')
+    def join_user_room(data):
+        user_id = data.get('user_id') if isinstance(data, dict) else None
+        if user_id:
+            join_room(f'user:{user_id}')
+
+    @socketio.on('join_runner_room')
+    def join_runner_room():
+        join_room('runners')
+
+    @socketio.on('join_staff_room')
+    def join_staff_room():
+        join_room('staff')
+
+    register_socketio_events(socketio)
+
+    print("✅ Socket.IO initialized successfully")
+except Exception as socket_error:
+    print(f"⚠️ Socket.IO unavailable: {str(socket_error)}")
+    socketio = None
 
 # Handle CORS preflight requests
 @app.before_request
@@ -58,7 +101,7 @@ def handle_preflight():
         response = jsonify({'success': True})
         response.headers.add("Access-Control-Allow-Origin", request.headers.get('Origin', '*'))
         response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization")
-        response.headers.add("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS")
+        response.headers.add("Access-Control-Allow-Methods", "GET,PUT,PATCH,POST,DELETE,OPTIONS")
         response.headers.add("Access-Control-Allow-Credentials", "true")
         return response, 200
 
@@ -93,15 +136,24 @@ from routes.staff_admin_routes import staff_admin_bp
 from routes.cart_routes import cart_bp
 from routes.checkout_routes import checkout_bp
 from routes.rewards_routes import rewards_bp
+from routes.payment_routes import payment_bp
+from routes.payment_methods_routes import payment_methods_bp
+from routes.notification_routes import notification_bp
+from routes.review_routes import review_bp
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(menu_bp, url_prefix='/api/menu')
 app.register_blueprint(order_bp, url_prefix='/api/order')
+app.register_blueprint(order_bp, url_prefix='/api/orders', name='orders_alias')
 app.register_blueprint(checkout_bp, url_prefix='/api/checkout')
 app.register_blueprint(runner_bp, url_prefix='/api/runner')
 app.register_blueprint(rewards_bp, url_prefix='/api/rewards')
 app.register_blueprint(staff_admin_bp, url_prefix='/api/admin')
 app.register_blueprint(cart_bp, url_prefix='/api/cart')
+app.register_blueprint(payment_bp, url_prefix='/api/payment')
+app.register_blueprint(payment_methods_bp, url_prefix='/api/payment-methods')
+app.register_blueprint(notification_bp, url_prefix='/api/notifications')
+app.register_blueprint(review_bp, url_prefix='/api/reviews')
 
 # Global error handlers
 @app.errorhandler(404)
@@ -124,10 +176,149 @@ def handle_exception(error):
     }), 500
 
 # Create tables and initialize data
+def run_startup_migrations():
+    """Apply lightweight SQLite schema fixes for existing local databases."""
+    try:
+        inspector = inspect(db.engine)
+
+        if 'orders' in inspector.get_table_names():
+            existing_columns = {column['name'] for column in inspector.get_columns('orders')}
+            required_order_columns = {
+                'received_by_canteen_at': 'ALTER TABLE orders ADD COLUMN received_by_canteen_at DATETIME',
+                'preparation_started_at': 'ALTER TABLE orders ADD COLUMN preparation_started_at DATETIME',
+                'ready_for_pickup_at': 'ALTER TABLE orders ADD COLUMN ready_for_pickup_at DATETIME',
+                'picked_up_at': 'ALTER TABLE orders ADD COLUMN picked_up_at DATETIME',
+                'in_transit_at': 'ALTER TABLE orders ADD COLUMN in_transit_at DATETIME',
+                'delivered_at': 'ALTER TABLE orders ADD COLUMN delivered_at DATETIME',
+            }
+
+            for column_name, sql in required_order_columns.items():
+                if column_name not in existing_columns:
+                    db.session.execute(text(sql))
+                    print(f"✅ Added missing orders.{column_name} column")
+
+            db.session.commit()
+
+        if 'foods' in inspector.get_table_names():
+            existing_columns = {column['name'] for column in inspector.get_columns('foods')}
+            required_food_columns = {
+                'calories': 'ALTER TABLE foods ADD COLUMN calories INTEGER',
+                'ingredients': 'ALTER TABLE foods ADD COLUMN ingredients TEXT',
+                'counter_number': 'ALTER TABLE foods ADD COLUMN counter_number INTEGER',
+                'counter_name': 'ALTER TABLE foods ADD COLUMN counter_name VARCHAR(255)',
+            }
+
+            for column_name, sql in required_food_columns.items():
+                if column_name not in existing_columns:
+                    db.session.execute(text(sql))
+                    print(f"✅ Added missing foods.{column_name} column")
+
+            db.session.commit()
+
+        if 'cart_items' in inspector.get_table_names():
+            existing_columns = {column['name'] for column in inspector.get_columns('cart_items')}
+            if 'customizations' not in existing_columns:
+                db.session.execute(text('ALTER TABLE cart_items ADD COLUMN customizations TEXT'))
+                print('✅ Added missing cart_items.customizations column')
+                db.session.commit()
+
+        if 'order_items' in inspector.get_table_names():
+            existing_columns = {column['name'] for column in inspector.get_columns('order_items')}
+            if 'customizations' not in existing_columns:
+                db.session.execute(text('ALTER TABLE order_items ADD COLUMN customizations TEXT'))
+                print('✅ Added missing order_items.customizations column')
+                db.session.commit()
+
+        if 'deliveries' in inspector.get_table_names():
+            existing_columns = {column['name'] for column in inspector.get_columns('deliveries')}
+            required_delivery_columns = {
+                'accepted_at': 'ALTER TABLE deliveries ADD COLUMN accepted_at DATETIME',
+                'picked_at': 'ALTER TABLE deliveries ADD COLUMN picked_at DATETIME',
+                'on_the_way_at': 'ALTER TABLE deliveries ADD COLUMN on_the_way_at DATETIME',
+                'delivered_at': 'ALTER TABLE deliveries ADD COLUMN delivered_at DATETIME',
+            }
+
+            for column_name, sql in required_delivery_columns.items():
+                if column_name not in existing_columns:
+                    db.session.execute(text(sql))
+                    print(f"✅ Added missing deliveries.{column_name} column")
+            db.session.commit()
+
+        if 'payments' in inspector.get_table_names():
+            existing_columns = {column['name'] for column in inspector.get_columns('payments')}
+            required_payment_columns = {
+                'user_id': 'ALTER TABLE payments ADD COLUMN user_id VARCHAR(36)',
+                'method': "ALTER TABLE payments ADD COLUMN method VARCHAR(20) DEFAULT 'upi'",
+                'upi_id': 'ALTER TABLE payments ADD COLUMN upi_id VARCHAR(120)',
+                'card_last4': 'ALTER TABLE payments ADD COLUMN card_last4 VARCHAR(4)',
+                'card_number_hash': 'ALTER TABLE payments ADD COLUMN card_number_hash VARCHAR(255)',
+                'card_holder_name': 'ALTER TABLE payments ADD COLUMN card_holder_name VARCHAR(120)',
+                'card_expiry': 'ALTER TABLE payments ADD COLUMN card_expiry VARCHAR(7)',
+                'updated_at': 'ALTER TABLE payments ADD COLUMN updated_at DATETIME',
+            }
+
+            for column_name, sql in required_payment_columns.items():
+                if column_name not in existing_columns:
+                    db.session.execute(text(sql))
+                    print(f"✅ Added missing payments.{column_name} column")
+
+            db.session.commit()
+
+        if 'notifications' in inspector.get_table_names():
+            existing_columns = {column['name'] for column in inspector.get_columns('notifications')}
+            required_notification_columns = {
+                'related_id': 'ALTER TABLE notifications ADD COLUMN related_id VARCHAR(36)',
+                'action_url': 'ALTER TABLE notifications ADD COLUMN action_url VARCHAR(255)',
+            }
+
+            for column_name, sql in required_notification_columns.items():
+                if column_name not in existing_columns:
+                    db.session.execute(text(sql))
+                    print(f"✅ Added missing notifications.{column_name} column")
+
+            db.session.commit()
+
+        if 'reviews' in inspector.get_table_names():
+            existing_columns = {column['name'] for column in inspector.get_columns('reviews')}
+            if 'order_id' not in existing_columns:
+                db.session.execute(text('ALTER TABLE reviews ADD COLUMN order_id VARCHAR(36)'))
+                print('✅ Added missing reviews.order_id column')
+            if 'is_seeded' not in existing_columns:
+                db.session.execute(text('ALTER TABLE reviews ADD COLUMN is_seeded BOOLEAN DEFAULT 0'))
+                print('✅ Added missing reviews.is_seeded column')
+            if 'seeded_name' not in existing_columns:
+                db.session.execute(text('ALTER TABLE reviews ADD COLUMN seeded_name VARCHAR(255)'))
+                print('✅ Added missing reviews.seeded_name column')
+            db.session.commit()
+
+        if 'order_otps' in inspector.get_table_names():
+            existing_columns = {column['name'] for column in inspector.get_columns('order_otps')}
+            if 'otp_type' not in existing_columns:
+                db.session.execute(text("ALTER TABLE order_otps ADD COLUMN otp_type VARCHAR(20) DEFAULT 'delivery'"))
+                print('✅ Added missing order_otps.otp_type column')
+                db.session.commit()
+
+        if 'users' in inspector.get_table_names():
+            existing_columns = {column['name'] for column in inspector.get_columns('users')}
+            if 'notification_preferences' not in existing_columns:
+                db.session.execute(text("ALTER TABLE users ADD COLUMN notification_preferences JSON"))
+                print('✅ Added missing users.notification_preferences column')
+                db.session.commit()
+    except Exception as migration_error:
+        db.session.rollback()
+        print(f"⚠️ Startup migration warning: {migration_error}")
+
+
 try:
     with app.app_context():
         db.create_all()
+        run_startup_migrations()
         print("✅ Database tables created")
+        try:
+            from seed import seed_sample_reviews
+            seed_sample_reviews()
+        except Exception as seed_error:
+            print(f"⚠️ Review seed warning: {seed_error}")
         
         # Auto-initialize database on app startup if empty
         from models import Food
@@ -493,4 +684,7 @@ def test_email():
         }), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    if socketio:
+        socketio.run(app, debug=True, port=5000)
+    else:
+        app.run(debug=True, port=5000)

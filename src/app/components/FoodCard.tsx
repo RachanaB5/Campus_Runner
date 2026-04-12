@@ -9,9 +9,10 @@ import { useNavigate } from "react-router";
 interface FoodCardProps {
   item: MenuItem;
   onAddSuccess?: () => void;  // callback to open cart drawer
+  onOpenDetail?: (id: string | number) => void;
 }
 
-export function FoodCard({ item, onAddSuccess }: FoodCardProps) {
+export function FoodCard({ item, onAddSuccess, onOpenDetail }: FoodCardProps) {
   const { addToCart, isLoading } = useCart();
   const { isLoggedIn } = useAuth();
   const navigate = useNavigate();
@@ -41,7 +42,10 @@ export function FoodCard({ item, onAddSuccess }: FoodCardProps) {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden group flex flex-col">
+    <div
+      className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden group flex flex-col cursor-pointer"
+      onClick={() => onOpenDetail?.(item.id)}
+    >
       {/* Image */}
       <div className="relative overflow-hidden h-44 flex-shrink-0">
         <ImageWithFallback

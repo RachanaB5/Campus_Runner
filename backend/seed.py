@@ -7,9 +7,10 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from app import app, db
-from models import Food
+from models import db
+from models import Food, Review, User
 import uuid
+from datetime import datetime, timedelta
 
 MENU_ITEMS = [
     # ── MEALS ─────────────────────────────────────────────────────────
@@ -434,8 +435,8 @@ MENU_ITEMS = [
 ]
 
 
-def seed_menu():
-    with app.app_context():
+def seed_menu(flask_app):
+    with flask_app.app_context():
         existing = Food.query.count()
         if existing > 0:
             print(f"Database already has {existing} food items. Clearing and re-seeding...")
@@ -454,12 +455,13 @@ def seed_menu():
                 prep_time=item_data.get("prep_time", 15),
                 image_url=item_data.get("image_url", ""),
                 available=True,
-                rating=4.5,
+                rating=0,
                 review_count=0,
             )
             db.session.add(food)
 
         db.session.commit()
+        seed_sample_reviews()
         print(f"✅ Successfully seeded {len(MENU_ITEMS)} menu items!")
 
         # Print category summary
@@ -470,5 +472,101 @@ def seed_menu():
             print(f"  {cat}: {count} items")
 
 
+def _seed_users():
+    seeded_users = [
+        ('Campus Foodie', 'foodie@rvu.edu.in'),
+        ('Arjun M.', 'arjun.seed@rvu.edu.in'),
+        ('Priya S.', 'priya.seed@rvu.edu.in'),
+    ]
+    created = []
+    for name, email in seeded_users:
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            user = User(
+                id=str(uuid.uuid4()),
+                name=name,
+                email=email,
+                role='customer',
+                is_verified=True,
+            )
+            user.set_password('seeded-pass-123')
+            db.session.add(user)
+        created.append(user)
+    db.session.flush()
+    return created
+
+
+def _review_templates(food):
+    lower_name = food.name.lower()
+    if 'biryani' in lower_name:
+        return [
+            (5, f'Absolutely the best {food.name.lower()} on campus. The aroma and spice balance are spot on.'),
+            (4, 'Really satisfying portion and great flavour. I would happily order this again after class.'),
+            (5, 'The rice stays fluffy and the masala tastes freshly made every single time.'),
+        ]
+    if any(keyword in lower_name for keyword in ['coffee', 'tea', 'juice', 'lassi', 'shake', 'soda']):
+        return [
+            (5, f'{food.name} is super refreshing and arrives chilled even during busy hours.'),
+            (4, 'Good taste and not overly sweet. Perfect add-on with a snack.'),
+            (5, 'Consistently fresh and exactly what I want between classes.'),
+        ]
+    if any(keyword in lower_name for keyword in ['burger', 'roll', 'pizza', 'sandwich']):
+        return [
+            (5, f'{food.name} has a great texture and tastes freshly made.'),
+            (4, 'Nicely filling and the flavours work really well together.'),
+            (5, 'One of my go-to picks when I want something quick but still satisfying.'),
+        ]
+    if any(keyword in lower_name for keyword in ['ice cream', 'kulfi', 'dessert', 'halwa']):
+        return [
+            (5, f'{food.name} is such a good sweet finish after a meal.'),
+            (4, 'Good portion and nice flavour without feeling too heavy.'),
+        ]
+    return [
+        (5, f'{food.name} tastes fresh and feels worth the price every time.'),
+        (4, 'Really dependable campus comfort food with solid flavour.'),
+        (5, 'I keep coming back to this because it is consistently good.'),
+    ]
+
+
+def seed_sample_reviews():
+    seeded_users = _seed_users()
+    foods = Food.query.all()
+    if not foods:
+        db.session.commit()
+        return
+
+    for food in foods:
+        existing_seeded = Review.query.filter_by(food_id=food.id, is_seeded=True).count()
+        if existing_seeded >= 2:
+            continue
+
+        templates = _review_templates(food)
+        for index, (rating, comment) in enumerate(templates):
+            seeded_user = seeded_users[index % len(seeded_users)]
+            review = Review(
+                id=str(uuid.uuid4()),
+                user_id=seeded_user.id,
+                food_id=food.id,
+                rating=rating,
+                comment=comment,
+                is_seeded=True,
+                seeded_name=seeded_user.name,
+                created_at=datetime.utcnow() - timedelta(days=(index + 1)),
+            )
+            db.session.add(review)
+
+    db.session.flush()
+
+    for food in foods:
+        reviews = Review.query.filter_by(food_id=food.id).all()
+        if not reviews:
+            continue
+        food.rating = round(sum(review.rating for review in reviews) / len(reviews), 1)
+        food.review_count = len(reviews)
+
+    db.session.commit()
+
+
 if __name__ == "__main__":
-    seed_menu()
+    from app import app
+    seed_menu(app)

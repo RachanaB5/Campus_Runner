@@ -12,6 +12,14 @@ class User(db.Model):
     password_hash = db.Column(db.String(255))
     role = db.Column(db.String(50), default='customer')  # customer, runner, staff, admin
     profile_image = db.Column(db.String(500))
+    notification_preferences = db.Column(db.JSON, default=lambda: {
+        'order_updates': True,
+        'runner_assigned': True,
+        'order_delivered': True,
+        'new_orders_available': True,
+        'reward_points': True,
+        'promotions': False,
+    })
     wallet_balance = db.Column(db.Float, default=0.0)
     is_verified = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -38,6 +46,8 @@ class User(db.Model):
             'phone': self.phone,
             'role': self.role,
             'profile_image': self.profile_image,
+            'avatar_url': self.profile_image,
+            'notification_preferences': self.notification_preferences or {},
             'wallet_balance': self.wallet_balance,
             'is_verified': self.is_verified,
             'created_at': self.created_at.isoformat() if self.created_at else None,

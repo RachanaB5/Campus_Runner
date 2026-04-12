@@ -9,6 +9,7 @@ export interface CartItem {
   quantity: number;
   price: number;
   total: number;
+  customizations?: string;
   created_at: string;
   updated_at: string;
 }
@@ -26,9 +27,9 @@ export interface Cart {
 interface CartContextType {
   cart: Cart | null;
   isLoading: boolean;
-  addToCart: (foodId: string, quantity: number) => Promise<void>;
+  addToCart: (foodId: string, quantity: number, customizations?: string) => Promise<void>;
   removeFromCart: (itemId: string) => Promise<void>;
-  updateCartItem: (itemId: string, quantity: number) => Promise<void>;
+  updateCartItem: (itemId: string, quantity: number, customizations?: string) => Promise<void>;
   clearCart: () => Promise<void>;
   getCart: () => Promise<void>;
   getTotalItems: () => number;
@@ -47,6 +48,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (token) {
       getCart();
     }
+  }, []);
+
+  useEffect(() => {
+    const handleLogout = () => {
+      setCart(null);
+      setIsLoading(false);
+    };
+
+    window.addEventListener("auth:logout", handleLogout);
+    return () => window.removeEventListener("auth:logout", handleLogout);
   }, []);
 
   const getCart = async () => {
@@ -78,7 +89,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const addToCart = async (foodId: string, quantity: number) => {
+  const addToCart = async (foodId: string, quantity: number, customizations?: string) => {
     try {
       setIsLoading(true);
       const response = await fetch(`${api.API_BASE_URL}/cart/add`, {
@@ -87,7 +98,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${api.getToken()}`,
         },
-        body: JSON.stringify({ food_id: foodId, quantity }),
+        body: JSON.stringify({ food_id: foodId, quantity, customizations }),
       });
 
       if (!response.ok) {
@@ -137,7 +148,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const updateCartItem = async (itemId: string, quantity: number) => {
+  const updateCartItem = async (itemId: string, quantity: number, customizations?: string) => {
     try {
       setIsLoading(true);
       const response = await fetch(`${api.API_BASE_URL}/cart/item/${itemId}`, {
@@ -146,7 +157,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${api.getToken()}`,
         },
-        body: JSON.stringify({ quantity }),
+        body: JSON.stringify({ quantity, customizations }),
       });
 
       if (!response.ok) {

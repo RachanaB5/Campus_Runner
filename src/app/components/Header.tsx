@@ -2,8 +2,10 @@ import { Link, useLocation } from "react-router";
 import { ShoppingCart, User, Award, Bike, Home, Clock, LogIn, Settings } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../services/api";
+import { NotificationBell } from "./NotificationBell";
+import { RunnerActiveDeliveryPanel } from "./RunnerActiveDeliveryPanel";
 
 export function Header() {
   const location = useLocation();
@@ -11,6 +13,70 @@ export function Header() {
   const { getTotalItems } = useCart();
   const [isRunnerMode, setIsRunnerMode] = useState(false);
   const [isTogglingRunner, setIsTogglingRunner] = useState(false);
+  const [activeDelivery, setActiveDelivery] = useState<any | null>(null);
+  const [showDeliveryPanel, setShowDeliveryPanel] = useState(false);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setIsRunnerMode(false);
+      return;
+    }
+
+    let isMounted = true;
+    api.getRunnerProfile()
+      .then((runner) => {
+        if (isMounted) {
+          setIsRunnerMode(Boolean(runner?.is_available));
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setIsRunnerMode(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setActiveDelivery(null);
+      return;
+    }
+
+    let isMounted = true;
+    const checkActiveDelivery = async () => {
+      try {
+        const response = await api.getRunnerActiveDelivery();
+        if (!isMounted) return;
+        setActiveDelivery(response.active ? response : null);
+        if (response.active && localStorage.getItem("runner-open-delivery")) {
+          setShowDeliveryPanel(true);
+        }
+        if (!response.active) {
+          localStorage.removeItem("runner-open-delivery");
+        }
+      } catch {
+        if (isMounted) {
+          setActiveDelivery(null);
+        }
+      }
+    };
+
+    checkActiveDelivery();
+    const interval = window.setInterval(checkActiveDelivery, 10000);
+    const handleActiveDeliveryChanged = () => {
+      checkActiveDelivery();
+    };
+    window.addEventListener("runner:active-delivery-changed", handleActiveDeliveryChanged as EventListener);
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+      window.removeEventListener("runner:active-delivery-changed", handleActiveDeliveryChanged as EventListener);
+    };
+  }, [isLoggedIn]);
   
   const isActive = (path: string) => {
     return location.pathname === path;
@@ -27,37 +93,33 @@ export function Header() {
   const handleRunnerToggle = async () => {
     try {
       setIsTogglingRunner(true);
-      
-      if (!isRunnerMode) {
-        // Register as runner
-        const response = await api.registerAsRunner({
-          vehicle_type: "bike",
-          license_number: "DL-01-AB-2024",
-        });
-        if (response) {
-          setIsRunnerMode(true);
-          alert("Registered as runner! You can now accept deliveries.");
-        }
-      } else {
-        // Toggle availability
-        const response = await api.toggleRunnerAvailability();
-        if (response) {
-          setIsRunnerMode(!isRunnerMode);
-          alert(
-            response.is_available
-              ? "You are now available for deliveries"
-              : "You are now unavailable"
-          );
-        }
+
+      let hasRunnerProfile = false;
+      try {
+        const runnerProfile = await api.getRunnerProfile();
+        hasRunnerProfile = Boolean(runnerProfile?.id);
+      } catch {
+        hasRunnerProfile = false;
       }
+
+      if (!hasRunnerProfile) {
+        await api.registerAsRunner({
+          vehicle_type: "bike",
+          license_number: `DL-${Date.now()}`,
+        });
+      }
+
+      const response = await api.toggleRunnerAvailability();
+      const nextAvailability = Boolean(response?.runner?.is_available);
+      setIsRunnerMode(nextAvailability);
+      alert(
+        nextAvailability
+          ? "You are now available for deliveries"
+          : "You are now unavailable"
+      );
     } catch (error: any) {
       console.error("Error toggling runner mode:", error);
-      // If already registered, just toggle the mode
-      if (error.response?.status === 400 || error.message?.includes("already")) {
-        setIsRunnerMode(!isRunnerMode);
-      } else {
-        alert("Failed to toggle runner mode. Please try again.");
-      }
+      alert(error.message || "Failed to toggle runner mode. Please try again.");
     } finally {
       setIsTogglingRunner(false);
     }
@@ -123,6 +185,16 @@ export function Header() {
                   <Clock className="w-5 h-5" />
                   <span>Orders</span>
                 </Link>
+                {activeDelivery && (
+                  <button
+                    type="button"
+                    onClick={() => setShowDeliveryPanel(true)}
+                    className="relative flex items-center gap-2 rounded-full bg-green-500 px-4 py-2 text-sm font-semibold text-white animate-pulse"
+                  >
+                    🛵 My Delivery
+                    <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-orange-400" />
+                  </button>
+                )}
                 {isAdmin && (
                   <Link 
                     to="/admin" 
@@ -142,6 +214,7 @@ export function Header() {
           <div className="flex items-center gap-4">
             {isLoggedIn ? (
               <>
+                <NotificationBell />
                 <Link 
                   to="/cart" 
                   className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors"
@@ -216,6 +289,16 @@ export function Header() {
                 <Clock className="w-5 h-5" />
                 <span className="text-xs">Orders</span>
               </Link>
+              {activeDelivery && (
+                <button
+                  type="button"
+                  onClick={() => setShowDeliveryPanel(true)}
+                  className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg text-green-600"
+                >
+                  <span className="text-base animate-pulse">🛵</span>
+                  <span className="text-xs">My Delivery</span>
+                </button>
+              )}
               {isAdmin && (
                 <Link 
                   to="/admin" 
@@ -231,6 +314,24 @@ export function Header() {
           )}
         </div>
       </div>
+      <RunnerActiveDeliveryPanel
+        delivery={activeDelivery}
+        open={showDeliveryPanel && Boolean(activeDelivery)}
+        onClose={() => {
+          setShowDeliveryPanel(false);
+          if (activeDelivery?.delivery_status === 'delivered') {
+            setActiveDelivery(null);
+            localStorage.removeItem("runner-open-delivery");
+          }
+        }}
+        onStatusUpdate={(nextDelivery) => {
+          setActiveDelivery(nextDelivery);
+          if (!nextDelivery) {
+            setShowDeliveryPanel(false);
+            localStorage.removeItem("runner-open-delivery");
+          }
+        }}
+      />
     </header>
   );
 }

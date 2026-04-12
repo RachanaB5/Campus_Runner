@@ -6,6 +6,36 @@ from datetime import datetime
 
 rewards_bp = Blueprint('rewards', __name__)
 
+DEFAULT_VOUCHERS = [
+    {
+        'id': 'free-delivery',
+        'name': 'Free Delivery',
+        'description': 'Skip delivery fees on your next CampusRunner order.',
+        'points_required': 100,
+        'discount_type': 'delivery',
+        'discount_value': 10,
+        'is_active': True,
+    },
+    {
+        'id': 'ten-off',
+        'name': '₹10 Off',
+        'description': 'Get ₹10 off any order above ₹100.',
+        'points_required': 150,
+        'discount_type': 'flat',
+        'discount_value': 10,
+        'is_active': True,
+    },
+    {
+        'id': 'twenty-five-off',
+        'name': '₹25 Off',
+        'description': 'Save ₹25 on your next food order.',
+        'points_required': 300,
+        'discount_type': 'flat',
+        'discount_value': 25,
+        'is_active': True,
+    },
+]
+
 @rewards_bp.route('/my-points', methods=['GET'])
 @jwt_required()
 def get_my_points():
@@ -105,6 +135,25 @@ def redeem_points():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+@rewards_bp.route('/available', methods=['GET'])
+@rewards_bp.route('/vouchers', methods=['GET'])
+@jwt_required()
+def get_available_rewards():
+    """Get active reward vouchers."""
+    return jsonify({'rewards': DEFAULT_VOUCHERS, 'vouchers': DEFAULT_VOUCHERS}), 200
+
+@rewards_bp.route('/balance', methods=['GET'])
+@jwt_required()
+def get_rewards_balance():
+    """Alias for the frontend/spec rewards balance endpoint."""
+    return get_my_points()
+
+@rewards_bp.route('/history', methods=['GET'])
+@jwt_required()
+def get_rewards_history():
+    """Alias for the frontend/spec rewards history endpoint."""
+    return get_transactions()
 
 @rewards_bp.route('/transactions', methods=['GET'])
 @jwt_required()

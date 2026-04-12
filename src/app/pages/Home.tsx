@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Search, ShoppingCart, X, Plus, Minus, Trash2, ArrowRight, Leaf, Bike, MapPin, Clock } from "lucide-react";
 import { menuItems } from "../data/mockData";
 import { FoodCard } from "../components/FoodCard";
+import { FoodDetailModal } from "../components/FoodDetailModal";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router";
@@ -29,14 +30,39 @@ const CATEGORIES = [
   { label: "Biriyanis", emoji: "🍛" },
   { label: "Parathas", emoji: "🫓" },
   { label: "Pasta", emoji: "🍝" },
-  { label: "Pizza & Bread", emoji: "🍕" },
+  { label: "Pizzas", emoji: "🍕" },
   { label: "Rolls", emoji: "🌯" },
   { label: "Burgers", emoji: "🍔" },
   { label: "Maggi", emoji: "🍜" },
-  { label: "Snacks", emoji: "🥗" },
   { label: "Ice Cream", emoji: "🍦" },
   { label: "Beverages", emoji: "🥤" },
 ];
+
+const CATEGORY_NORMALIZATION: Record<string, string> = {
+  "biryani": "Biriyanis",
+  "biryanis": "Biriyanis",
+  "pizza & bread": "Pizzas",
+  "pizzas": "Pizzas",
+  "cold drinks": "Beverages",
+  "tea & coffee": "Beverages",
+  "other drinks": "Beverages",
+  "fresh juices": "Beverages",
+  "soda": "Beverages",
+  "lassi": "Beverages",
+  "smooth drinks": "Beverages",
+  "special shakes": "Beverages",
+  "paper boat": "Beverages",
+  "tropicana": "Beverages",
+  "milk shakes": "Beverages",
+};
+
+const normalizeCategory = (category?: string) => {
+  const normalized = (category || "").trim().toLowerCase();
+  return CATEGORY_NORMALIZATION[normalized] || category || "Other";
+};
+
+const normalizeSearchText = (value: string) =>
+  value.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 
 export function Home() {
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
@@ -47,6 +73,7 @@ export function Home() {
   const [showDeliveries, setShowDeliveries] = useState(false);
   const [availableDeliveries, setAvailableDeliveries] = useState<any[]>([]);
   const [isLoadingDeliveries, setIsLoadingDeliveries] = useState(false);
+  const [selectedFoodId, setSelectedFoodId] = useState<string | null>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -96,7 +123,7 @@ export function Home() {
           name: food.name,
           description: food.description,
           price: food.price,
-          category: food.category,
+          category: normalizeCategory(food.category),
           image: food.image_url || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop",
           prepTime: food.prep_time ? `${food.prep_time} min` : "15 min",
           rating: food.rating || 4.5,
@@ -115,9 +142,9 @@ export function Home() {
 
   const filteredItems = items.filter((item) => {
     const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;
-    const matchesSearch =
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const normalizedQuery = normalizeSearchText(searchQuery);
+    const haystack = normalizeSearchText(`${item.name} ${item.description} ${item.category}`);
+    const matchesSearch = !normalizedQuery || haystack.includes(normalizedQuery);
     return matchesCategory && matchesSearch;
   });
 
@@ -284,7 +311,7 @@ export function Home() {
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredItems.map((item) => (
-              <FoodCard key={item.id} item={item} onAddSuccess={() => setCartOpen(true)} />
+              <FoodCard key={item.id} item={item} onAddSuccess={() => setCartOpen(true)} onOpenDetail={(id) => setSelectedFoodId(String(id))} />
             ))}
           </div>
           {filteredItems.length === 0 && (
@@ -298,6 +325,7 @@ export function Home() {
           )}
         </>
       )}
+      <FoodDetailModal foodId={selectedFoodId} open={Boolean(selectedFoodId)} onClose={() => setSelectedFoodId(null)} />
 
       {/* ── Cart Drawer Overlay ──────────────────────────────────── */}
       {cartOpen && (

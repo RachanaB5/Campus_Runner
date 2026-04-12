@@ -10,6 +10,8 @@ import { Profile } from "./pages/Profile";
 import { Orders } from "./pages/Orders";
 import { Payment } from "./pages/Payment";
 import { Admin } from "./pages/Admin";
+import { OrderTrackingPage } from "./pages/OrderTrackingPage";
+import { RunnerDeliveryPage } from "./pages/RunnerDeliveryPage";
 
 export const router = createBrowserRouter([
   {
@@ -21,9 +23,11 @@ export const router = createBrowserRouter([
       { path: "cart", Component: Cart },
       { path: "checkout", Component: Checkout },
       { path: "runner", Component: RunnerMode },
+      { path: "runner/delivery/:deliveryId", Component: RunnerDeliveryPage },
       { path: "rewards", Component: Rewards },
       { path: "profile", Component: Profile },
       { path: "orders", Component: Orders },
+      { path: "orders/:id/track", Component: OrderTrackingPage },
       { path: "payment", Component: Payment },
       { path: "admin", Component: Admin },
     ],

@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, Order, OrderItem, User, Food, Delivery, RewardPoints, RewardTransaction
+from models import db, Order, OrderItem, User, Food, Delivery, RewardPoints, RewardTransaction, Review, OrderOTP, Runner
 from datetime import datetime, timedelta
 import uuid
 
@@ -18,6 +18,31 @@ def get_available_runner():
     # Get a runner who is registered and available
     runner = User.query.filter_by(role='runner').first()
     return runner
+
+
+def _format_time(value):
+    if not value:
+        return None
+    return value.strftime('%I:%M %p').lstrip('0')
+
+
+def _get_reviewable_items(order, user_id):
+    existing = {
+        (review.order_id, review.food_id)
+        for review in Review.query.filter_by(user_id=user_id).all()
+    }
+    items = []
+    for item in order.items or []:
+        if (order.id, item.food_id) not in existing:
+            items.append({
+                'food_id': item.food_id,
+                'food_name': item.food.name if item.food else 'Item',
+                'image_url': item.food.image_url if item.food else None,
+                'quantity': item.quantity,
+                'unit_price': item.unit_price,
+                'customizations': item.customizations,
+            })
+    return items
 
 @order_bp.route('/create', methods=['POST'])
 @jwt_required()
@@ -118,8 +143,15 @@ def get_my_orders():
         user_id = get_jwt_identity()
         orders = Order.query.filter_by(customer_id=user_id).order_by(Order.created_at.desc()).all()
         
+        response_orders = []
+        for order in orders:
+            order_dict = order.to_dict()
+            order_dict['reviewable_items'] = _get_reviewable_items(order, user_id) if order.status == 'delivered' else []
+            order_dict['has_unreviewed_items'] = order.status == 'delivered' and len(order_dict['reviewable_items']) > 0
+            response_orders.append(order_dict)
+
         return jsonify({
-            'orders': [order.to_dict() for order in orders]
+            'orders': response_orders
         }), 200
     
     except Exception as e:
@@ -300,6 +332,87 @@ def update_order_status(order_id):
     
     except Exception as e:
         db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@order_bp.route('/<order_id>/track', methods=['GET'])
+@jwt_required()
+def get_order_tracking(order_id):
+    try:
+        user_id = get_jwt_identity()
+        order = Order.query.get(order_id)
+        if not order:
+            return jsonify({'error': 'Order not found'}), 404
+        if order.customer_id != user_id:
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        delivery = order.delivery
+        delivery_otp = None
+        pickup_otp = None
+        if delivery:
+            delivery_otp_obj = OrderOTP.query.filter_by(order_id=order.id, delivery_id=delivery.id, otp_type='delivery').order_by(OrderOTP.created_at.desc()).first()
+            delivery_otp = delivery_otp_obj.otp if delivery_otp_obj else None
+            pickup_otp_obj = OrderOTP.query.filter_by(order_id=order.id, delivery_id=delivery.id, otp_type='pickup').order_by(OrderOTP.created_at.desc()).first()
+            pickup_otp = pickup_otp_obj.otp if pickup_otp_obj else None
+
+        runner_info = None
+        if delivery and delivery.runner_id:
+            runner_user = User.query.get(delivery.runner_id)
+            runner_profile = Runner.query.filter_by(user_id=delivery.runner_id).first()
+            runner_info = {
+                'name': runner_user.name if runner_user else None,
+                'rating': round(runner_profile.average_rating, 1) if runner_profile else 4.8,
+                'completed_deliveries': runner_profile.total_deliveries if runner_profile else 0,
+                'phone': runner_user.phone if runner_user and order.status in ['picked_up', 'in_transit', 'on_the_way', 'delivered'] else None,
+            }
+
+        subtotal = sum(item.total_price for item in (order.items or []))
+        tax = max(0.0, round(float(order.total_amount or 0) - float(order.delivery_fee or 0) - float(subtotal or 0), 2))
+        timeline = [
+            {'status': 'placed', 'label': 'Order Placed', 'time': _format_time(order.created_at), 'done': True},
+            {'status': 'accepted', 'label': "Accepted by Mingo's", 'time': _format_time(order.received_by_canteen_at or order.created_at), 'done': order.status not in ['placed', 'pending']},
+            {'status': 'runner_assigned', 'label': 'Runner Assigned', 'time': _format_time(delivery.accepted_at if delivery else None), 'done': bool(delivery and delivery.runner_id)},
+            {'status': 'picked_up', 'label': 'Picked Up by Runner', 'time': _format_time(order.picked_up_at or (delivery.picked_at if delivery else None)), 'done': order.status in ['picked_up', 'in_transit', 'on_the_way', 'delivered']},
+            {'status': 'on_the_way', 'label': 'Order On the Way', 'time': _format_time(order.in_transit_at or (delivery.on_the_way_at if delivery else None)), 'done': order.status in ['in_transit', 'on_the_way', 'delivered']},
+            {'status': 'delivered', 'label': 'Order Delivered', 'time': _format_time(order.delivered_at), 'done': order.status == 'delivered'},
+        ]
+
+        return jsonify({
+            'order_id': order.id,
+            'token_number': order.order_number,
+            'status': order.status,
+            'payment_method': order.payment_method,
+            'payment_status': order.payment_status,
+            'total_amount': order.total_amount,
+            'subtotal': subtotal,
+            'delivery_fee': order.delivery_fee,
+            'tax': tax,
+            'items': [item.to_dict() for item in (order.items or [])],
+            'placed_at': order.created_at.isoformat() if order.created_at else None,
+            'estimated_delivery': order.estimated_delivery_time.isoformat() if order.estimated_delivery_time else None,
+            'delivery_otp': delivery_otp,
+            'pickup_otp': pickup_otp,
+            'runner': runner_info,
+            'timeline': timeline,
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@order_bp.route('/<order_id>/reviewable-items', methods=['GET'])
+@jwt_required()
+def get_reviewable_items(order_id):
+    try:
+        user_id = get_jwt_identity()
+        order = Order.query.get(order_id)
+        if not order:
+            return jsonify({'error': 'Order not found'}), 404
+        if order.customer_id != user_id:
+            return jsonify({'error': 'Unauthorized'}), 403
+        if order.status != 'delivered':
+            return jsonify({'items': []}), 200
+        return jsonify({'items': _get_reviewable_items(order, user_id)}), 200
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 

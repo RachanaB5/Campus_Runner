@@ -36,7 +36,7 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
   });
 
   if (!response.ok) {
-    if (response.status === 401) {
+    if (response.status === 401 && !endpoint.startsWith('/auth/')) {
       // Unauthorized - clear token
       removeToken();
       window.location.href = '/login';
@@ -71,7 +71,21 @@ export const authAPI = {
   },
 
   updateProfile: async (data: { name?: string; phone?: string; profile_image?: string }) => {
-    return apiRequest('/auth/update-profile', {
+    return apiRequest('/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  changePassword: async (data: { current_password: string; new_password: string; confirm_password: string }) => {
+    return apiRequest('/auth/change-password', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateNotificationPreferences: async (data: Record<string, boolean>) => {
+    return apiRequest('/auth/notification-preferences', {
       method: 'PUT',
       body: JSON.stringify(data),
     });
@@ -175,6 +189,14 @@ export const orderAPI = {
     return apiRequest(`/order/${orderId}`);
   },
 
+  getOrderTracking: async (orderId: string) => {
+    return apiRequest(`/orders/${orderId}/track`);
+  },
+
+  getReviewableItems: async (orderId: string) => {
+    return apiRequest(`/orders/${orderId}/reviewable-items`);
+  },
+
   cancelOrder: async (orderId: string) => {
     return apiRequest(`/order/${orderId}/cancel`, {
       method: 'POST',
@@ -224,6 +246,31 @@ export const runnerAPI = {
   // New order tracking endpoints
   getAvailableOrders: async () => {
     return apiRequest('/runner/available-orders');
+  },
+
+  getActiveDelivery: async () => {
+    return apiRequest('/runner/active-delivery');
+  },
+
+  acceptOrder: async (orderId: string) => {
+    return apiRequest(`/runner/accept/${orderId}`, {
+      method: 'POST',
+    });
+  },
+
+  getOrderDetails: async (orderId: string) => {
+    return apiRequest(`/runner/order/${orderId}/details`);
+  },
+
+  getDeliveryDetails: async (deliveryId: string) => {
+    return apiRequest(`/runner/delivery/${deliveryId}/details`);
+  },
+
+  updateDeliveryStatusV2: async (deliveryId: string, status: string, otp?: string) => {
+    return apiRequest(`/runner/delivery/${deliveryId}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status, otp }),
+    });
   },
 
   pickupOrder: async (orderId: string) => {
@@ -280,6 +327,9 @@ export const runnerAPI = {
     });
   },
 };
+
+export const getAvailableDeliveries = runnerAPI.getAvailableDeliveries;
+export const acceptDelivery = runnerAPI.acceptDelivery;
 
 // Admin API
 export const adminAPI = {
@@ -341,22 +391,22 @@ export const adminAPI = {
 // Cart API
 export const cartAPI = {
   getCart: async () => {
-    return apiRequest('/cart/get', {
+    return apiRequest('/cart', {
       method: 'GET',
     });
   },
 
-  addToCart: async (foodId: string, quantity: number) => {
+  addToCart: async (foodId: string, quantity: number, customizations?: string) => {
     return apiRequest('/cart/add', {
       method: 'POST',
-      body: JSON.stringify({ food_id: foodId, quantity }),
+      body: JSON.stringify({ food_id: foodId, quantity, customizations }),
     });
   },
 
-  updateCartItem: async (itemId: string, quantity: number) => {
+  updateCartItem: async (itemId: string, quantity: number, customizations?: string) => {
     return apiRequest(`/cart/item/${itemId}`, {
       method: 'PUT',
-      body: JSON.stringify({ quantity }),
+      body: JSON.stringify({ quantity, customizations }),
     });
   },
 
@@ -370,6 +420,105 @@ export const cartAPI = {
     return apiRequest('/cart/clear', {
       method: 'DELETE',
     });
+  },
+};
+
+export const paymentAPI = {
+  initiate: async (data: {
+    order_id: string;
+    method: 'cod' | 'upi' | 'card';
+    upi_id?: string;
+    card_number?: string;
+    card_holder_name?: string;
+    card_expiry?: string;
+    card_pin?: string;
+    saved_method_id?: string;
+  }) => {
+    return apiRequest('/payment/initiate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  verifyUpi: async (data: {
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  }) => {
+    return apiRequest('/payment/verify-upi', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  history: async () => {
+    return apiRequest('/payment/history');
+  },
+
+  refund: async (paymentId: string) => {
+    return apiRequest(`/payment/refund/${paymentId}`, {
+      method: 'POST',
+    });
+  },
+};
+
+export const paymentMethodsAPI = {
+  list: async () => {
+    return apiRequest('/payment-methods');
+  },
+
+  create: async (data: any) => {
+    return apiRequest('/payment-methods', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  remove: async (methodId: string) => {
+    return apiRequest(`/payment-methods/${methodId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  setDefault: async (methodId: string) => {
+    return apiRequest(`/payment-methods/${methodId}/default`, {
+      method: 'PUT',
+    });
+  },
+};
+
+export const notificationAPI = {
+  list: async (params?: { unread?: boolean; limit?: number }) => {
+    const query = new URLSearchParams();
+    if (params?.unread) query.set('unread', 'true');
+    if (params?.limit) query.set('limit', String(params.limit));
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return apiRequest(`/notifications${suffix}`);
+  },
+
+  markAllRead: async () => {
+    return apiRequest('/notifications/read-all', {
+      method: 'PUT',
+    });
+  },
+
+  markRead: async (notificationId: string) => {
+    return apiRequest(`/notifications/${notificationId}/read`, {
+      method: 'PUT',
+    });
+  },
+};
+
+export const reviewAPI = {
+  submit: async (data: { order_id: string; food_id: string; rating: number; comment?: string }) => {
+    return apiRequest('/reviews', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  listForFood: async (foodId: string) => {
+    return apiRequest(`/reviews/${foodId}`);
   },
 };
 
@@ -397,6 +546,8 @@ export const api = {
   createOrder: orderAPI.createOrder,
   getMyOrders: orderAPI.getMyOrders,
   getOrderDetail: orderAPI.getOrderDetail,
+  getOrderTracking: orderAPI.getOrderTracking,
+  getReviewableItems: orderAPI.getReviewableItems,
   cancelOrder: orderAPI.cancelOrder,
   confirmOrder: orderAPI.confirmOrder,
   updateOrderStatus: orderAPI.updateOrderStatus,
@@ -414,6 +565,11 @@ export const api = {
   updateLocation: runnerAPI.updateLocation,
   toggleRunnerAvailability: runnerAPI.toggleAvailability,
   getAvailableOrders: runnerAPI.getAvailableOrders,
+  getRunnerActiveDelivery: runnerAPI.getActiveDelivery,
+  acceptOrder: runnerAPI.acceptOrder,
+  getRunnerOrderDetails: runnerAPI.getOrderDetails,
+  getRunnerDeliveryDetails: runnerAPI.getDeliveryDetails,
+  updateRunnerDeliveryStatus: runnerAPI.updateDeliveryStatusV2,
   pickupOrder: runnerAPI.pickupOrder,
   markInTransit: runnerAPI.markInTransit,
   deliverOrder: runnerAPI.deliverOrder,
@@ -441,4 +597,25 @@ export const api = {
   updateCartItem: cartAPI.updateCartItem,
   removeFromCart: cartAPI.removeFromCart,
   clearCart: cartAPI.clearCart,
+
+  // Payment methods
+  createPaymentOrder: paymentAPI.initiate,
+  verifyPayment: paymentAPI.verifyUpi,
+  refundPayment: paymentAPI.refund,
+  getPaymentHistory: paymentAPI.history,
+  getSavedPaymentMethods: paymentMethodsAPI.list,
+  createSavedPaymentMethod: paymentMethodsAPI.create,
+  removeSavedPaymentMethod: paymentMethodsAPI.remove,
+  setDefaultPaymentMethod: paymentMethodsAPI.setDefault,
+
+  // Notification methods
+  getNotifications: notificationAPI.list,
+  markNotificationsRead: notificationAPI.markAllRead,
+  markNotificationRead: notificationAPI.markRead,
+
+  // Review methods
+  submitReview: reviewAPI.submit,
+  getFoodReviews: reviewAPI.listForFood,
+  changePassword: authAPI.changePassword,
+  updateNotificationPreferences: authAPI.updateNotificationPreferences,
 };
