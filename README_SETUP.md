@@ -72,7 +72,7 @@ npm run dev
 ```
 Frontend runs on: `http://localhost:5173`
 
-### 2. Backend Setup
+c### 2. Backend Setup
 
 ```bash
 # Create Python virtual environment
