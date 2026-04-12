@@ -5,9 +5,18 @@ import uuid
 from datetime import datetime, timedelta
 import random
 import re
+import os
 
 auth_bp = Blueprint('auth', __name__)
 otp_store = {}
+
+OTP_RESEND_COOLDOWN_SECONDS = 60
+
+
+def normalize_email(value):
+    if value is None:
+        return ''
+    return str(value).strip().lower()
 
 
 def generate_otp():
@@ -84,23 +93,26 @@ def register():
             db.session.add(reward)
             db.session.commit()
         
-        # Create access token
-        access_token = create_access_token(identity=user.id, expires_delta=timedelta(days=30))
-        
         print(f"✅ User registered: {data['email']}")
+        now = datetime.utcnow()
         otp = generate_otp()
         otp_store[user.email] = {
             'otp': otp,
             'purpose': 'signup',
-            'expires_at': datetime.utcnow() + timedelta(minutes=10),
+            'expires_at': now + timedelta(minutes=10),
+            'last_sent_at': now,
         }
         queue_otp_email(user.email, otp, 'Signup Verification')
         
-        return jsonify({
+        body = {
             'message': 'User registered successfully. Verification OTP sent.',
             'user': user.to_dict(),
-            'access_token': access_token
-        }), 201
+            'requires_verification': True,
+        }
+        # Automated E2E only: set E2E_AUTH_OTP_IN_RESPONSE=1 on the API process; never in production.
+        if os.environ.get('E2E_AUTH_OTP_IN_RESPONSE') == '1':
+            body['otp'] = otp
+        return jsonify(body), 201
     
     except Exception as e:
         print(f"❌ Registration error: {str(e)}")
@@ -111,11 +123,11 @@ def register():
 
 @auth_bp.route('/verify-otp', methods=['POST'])
 def verify_otp():
-    """Verify signup or password-reset OTP."""
+    """Verify signup OTP and issue a session. Password reset uses /reset-password only."""
     try:
         data = request.get_json() or {}
-        email = data.get('email')
-        otp = data.get('otp')
+        email = normalize_email(data.get('email'))
+        otp = (data.get('otp') or '').strip()
         record = otp_store.get(email)
         
         if not email or not otp:
@@ -124,23 +136,77 @@ def verify_otp():
             return jsonify({'error': 'Invalid OTP'}), 400
         if datetime.utcnow() > record['expires_at']:
             return jsonify({'error': 'OTP expired'}), 400
+        if record.get('purpose') != 'signup':
+            return jsonify({'error': 'Use the password reset form for this code'}), 400
         
         user = User.query.filter_by(email=email).first()
-        if user:
-            user.is_verified = True
-            db.session.commit()
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        user.is_verified = True
+        db.session.commit()
         otp_store.pop(email, None)
+        access_token = create_access_token(identity=user.id, expires_delta=timedelta(days=30))
         
-        return jsonify({'message': 'OTP verified successfully'}), 200
+        return jsonify({
+            'message': 'Email verified successfully',
+            'user': user.to_dict(),
+            'access_token': access_token,
+        }), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+@auth_bp.route('/resend-otp', methods=['POST'])
+def resend_otp():
+    """Resend signup or password-reset OTP with cooldown."""
+    data = request.get_json() or {}
+    email = normalize_email(data.get('email'))
+    purpose = (data.get('purpose') or 'signup').strip().lower()
+    if purpose not in ('signup', 'password_reset'):
+        return jsonify({'error': 'Invalid purpose'}), 400
+    if not email:
+        return jsonify({'error': 'Email is required'}), 400
+
+    user = User.query.filter_by(email=email).first()
+    now = datetime.utcnow()
+
+    if purpose == 'signup':
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        if user.is_verified:
+            return jsonify({'error': 'Email is already verified'}), 400
+    else:
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+    existing = otp_store.get(email)
+    if existing and existing.get('last_sent_at'):
+        elapsed = (now - existing['last_sent_at']).total_seconds()
+        if elapsed < OTP_RESEND_COOLDOWN_SECONDS:
+            wait = int(OTP_RESEND_COOLDOWN_SECONDS - elapsed)
+            return jsonify({
+                'error': f'Please wait {wait}s before requesting another code',
+                'code': 'COOLDOWN',
+                'retry_after': wait,
+            }), 429
+
+    otp = generate_otp()
+    otp_store[email] = {
+        'otp': otp,
+        'purpose': purpose,
+        'expires_at': now + timedelta(minutes=10),
+        'last_sent_at': now,
+    }
+    label = 'Signup Verification' if purpose == 'signup' else 'Password Reset'
+    queue_otp_email(email, otp, label)
+    return jsonify({'message': 'OTP sent'}), 200
 
 @auth_bp.route('/forgot-password', methods=['POST'])
 def forgot_password():
     """Send password reset OTP."""
     data = request.get_json() or {}
-    email = data.get('email')
+    email = normalize_email(data.get('email'))
     
     if not email:
         return jsonify({'error': 'Email is required'}), 400
@@ -148,11 +214,24 @@ def forgot_password():
     if not user:
         return jsonify({'error': 'User not found'}), 404
     
+    now = datetime.utcnow()
+    existing = otp_store.get(email)
+    if existing and existing.get('last_sent_at'):
+        elapsed = (now - existing['last_sent_at']).total_seconds()
+        if elapsed < OTP_RESEND_COOLDOWN_SECONDS:
+            wait = int(OTP_RESEND_COOLDOWN_SECONDS - elapsed)
+            return jsonify({
+                'error': f'Please wait {wait}s before requesting another code',
+                'code': 'COOLDOWN',
+                'retry_after': wait,
+            }), 429
+
     otp = generate_otp()
     otp_store[email] = {
         'otp': otp,
         'purpose': 'password_reset',
-        'expires_at': datetime.utcnow() + timedelta(minutes=10),
+        'expires_at': now + timedelta(minutes=10),
+        'last_sent_at': now,
     }
     queue_otp_email(email, otp, 'Password Reset')
     
@@ -163,8 +242,8 @@ def reset_password():
     """Reset password using OTP."""
     try:
         data = request.get_json() or {}
-        email = data.get('email')
-        otp = data.get('otp')
+        email = normalize_email(data.get('email'))
+        otp = (data.get('otp') or '').strip()
         password = data.get('password')
         record = otp_store.get(email)
         
@@ -204,6 +283,12 @@ def login():
         if not user or not user.check_password(data['password']):
             print(f"⚠️ Failed login attempt for: {email}")
             return jsonify({'error': 'Invalid email or password'}), 401
+
+        if not user.is_verified:
+            return jsonify({
+                'error': 'Please verify your RV University email before logging in. Check your inbox for the code.',
+                'code': 'EMAIL_NOT_VERIFIED',
+            }), 403
         
         # Create access token
         access_token = create_access_token(identity=user.id, expires_delta=timedelta(days=30))

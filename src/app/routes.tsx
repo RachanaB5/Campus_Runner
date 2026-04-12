@@ -2,6 +2,8 @@ import { createBrowserRouter } from "react-router";
 import { Root } from "./components/Root";
 import { Home } from "./pages/Home";
 import { Login } from "./pages/Login";
+import { VerifyEmail } from "./pages/VerifyEmail";
+import { ForgotPassword } from "./pages/ForgotPassword";
 import { Cart } from "./pages/Cart";
 import { Checkout } from "./pages/Checkout";
 import { RunnerMode } from "./pages/RunnerMode";
@@ -20,6 +22,8 @@ export const router = createBrowserRouter([
     children: [
       { index: true, Component: Home },
       { path: "login", Component: Login },
+      { path: "verify-email", Component: VerifyEmail },
+      { path: "forgot-password", Component: ForgotPassword },
       { path: "cart", Component: Cart },
       { path: "checkout", Component: Checkout },
       { path: "runner", Component: RunnerMode },

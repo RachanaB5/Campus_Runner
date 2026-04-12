@@ -41,8 +41,19 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
       removeToken();
       window.location.href = '/login';
     }
-    const error = await response.json();
-    throw new Error(error.error || 'API request failed');
+    const body = await response.json().catch(() => ({}));
+    const message = (body as { error?: string }).error || 'API request failed';
+    const err = new Error(message) as Error & {
+      status?: number;
+      code?: string;
+      retry_after?: number;
+    };
+    err.status = response.status;
+    if ((body as { code?: string }).code) err.code = (body as { code: string }).code;
+    if ((body as { retry_after?: number }).retry_after != null) {
+      err.retry_after = (body as { retry_after: number }).retry_after;
+    }
+    throw err;
   }
 
   return response.json();
@@ -94,6 +105,34 @@ export const authAPI = {
   logout: async () => {
     return apiRequest('/auth/logout', {
       method: 'POST',
+    });
+  },
+
+  verifyOtp: async (data: { email: string; otp: string }) => {
+    return apiRequest('/auth/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  resendOtp: async (data: { email: string; purpose: 'signup' | 'password_reset' }) => {
+    return apiRequest('/auth/resend-otp', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  forgotPassword: async (email: string) => {
+    return apiRequest('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  resetPassword: async (data: { email: string; otp: string; password: string }) => {
+    return apiRequest('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   },
 };
