@@ -56,7 +56,10 @@ export function Login() {
         }
         const reg = await register(name.trim(), normalizedEmail, password, phone.trim());
         if (reg.requires_verification) {
-          navigate(`/verify-email?email=${encodeURIComponent(normalizedEmail)}`);
+          const devOtp = reg.dev_otp;
+          navigate(`/verify-email?email=${encodeURIComponent(normalizedEmail)}`, {
+            state: devOtp ? { devOtp } : undefined,
+          });
         } else {
           navigate("/");
         }

@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, has_request_context, current_app
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from models import db, User, RewardPoints, Order, Runner
 import uuid
@@ -23,12 +23,25 @@ def generate_otp():
     return ''.join(random.choices('0123456789', k=6))
 
 
-def queue_otp_email(email, otp, purpose):
+def _dev_mode_expose_otp():
     try:
-        from app import app
-        from utils import send_email_in_background
-        subject = f'CampusRunner {purpose} OTP'
-        html = f"""
+        if has_request_context() and getattr(current_app, 'debug', False):
+            return True
+    except RuntimeError:
+        pass
+    return (
+        os.environ.get('FLASK_ENV', '').lower() == 'development'
+        or os.environ.get('FLASK_DEBUG', '').lower() in ('1', 'true', 'yes')
+    )
+
+
+def dispatch_otp_email(to_email, otp, purpose):
+    """Send OTP synchronously so SMTP errors are visible. Returns (sent, error_or_none)."""
+    from app import app
+    from utils import send_otp_email_sync
+
+    subject = f'CampusRunner {purpose} OTP'
+    html = f"""
         <html>
           <body style="font-family: Arial, sans-serif;">
             <h2 style="color:#F97316;">CampusRunner Verification</h2>
@@ -38,9 +51,7 @@ def queue_otp_email(email, otp, purpose):
           </body>
         </html>
         """
-        send_email_in_background(app, subject, [email], html)
-    except Exception as e:
-        print(f"OTP email failed: {str(e)}")
+    return send_otp_email_sync(app, subject, [to_email], html, otp_for_log=otp)
 
 @auth_bp.route('/register', methods=['POST'])
 @auth_bp.route('/signup', methods=['POST'])
@@ -102,16 +113,20 @@ def register():
             'expires_at': now + timedelta(minutes=10),
             'last_sent_at': now,
         }
-        queue_otp_email(user.email, otp, 'Signup Verification')
-        
+        sent, _mail_err = dispatch_otp_email(user.email, otp, 'Signup Verification')
+
         body = {
-            'message': 'User registered successfully. Verification OTP sent.',
+            'message': 'User registered successfully. Check your email for the verification code.'
+            if sent else 'User registered successfully. Email could not be sent — configure SMTP or check the server log for this OTP.',
             'user': user.to_dict(),
             'requires_verification': True,
+            'email_sent': sent,
         }
         # Automated E2E only: set E2E_AUTH_OTP_IN_RESPONSE=1 on the API process; never in production.
         if os.environ.get('E2E_AUTH_OTP_IN_RESPONSE') == '1':
             body['otp'] = otp
+        if not sent and _dev_mode_expose_otp():
+            body['dev_otp'] = otp
         return jsonify(body), 201
     
     except Exception as e:
@@ -199,8 +214,11 @@ def resend_otp():
         'last_sent_at': now,
     }
     label = 'Signup Verification' if purpose == 'signup' else 'Password Reset'
-    queue_otp_email(email, otp, label)
-    return jsonify({'message': 'OTP sent'}), 200
+    sent, _ = dispatch_otp_email(email, otp, label)
+    payload = {'message': 'OTP sent' if sent else 'OTP generated but email was not sent', 'email_sent': sent}
+    if not sent and _dev_mode_expose_otp():
+        payload['dev_otp'] = otp
+    return jsonify(payload), 200
 
 @auth_bp.route('/forgot-password', methods=['POST'])
 def forgot_password():
@@ -233,9 +251,14 @@ def forgot_password():
         'expires_at': now + timedelta(minutes=10),
         'last_sent_at': now,
     }
-    queue_otp_email(email, otp, 'Password Reset')
-    
-    return jsonify({'message': 'Password reset OTP sent'}), 200
+    sent, _ = dispatch_otp_email(email, otp, 'Password Reset')
+    payload = {
+        'message': 'Password reset OTP sent' if sent else 'Password reset code generated but email was not sent.',
+        'email_sent': sent,
+    }
+    if not sent and _dev_mode_expose_otp():
+        payload['dev_otp'] = otp
+    return jsonify(payload), 200
 
 @auth_bp.route('/reset-password', methods=['POST'])
 def reset_password():

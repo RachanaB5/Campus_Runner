@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { AlertCircle, Loader, Mail, ShoppingBag } from "lucide-react";
 import { authAPI } from "../services/api";
 import { useAuth } from "../context/AuthContext";
@@ -8,8 +8,12 @@ const COOLDOWN_DEFAULT = 60;
 
 export function VerifyEmail() {
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const { verifySignupOtp, isLoggedIn } = useAuth();
+  const devOtpFromNav = (location.state as { devOtp?: string } | null)?.devOtp;
+  const [devOtpFallback, setDevOtpFallback] = useState<string | undefined>(undefined);
+  const devOtpHint = devOtpFromNav || devOtpFallback;
   const emailParam = (searchParams.get("email") || "").trim().toLowerCase();
 
   const [otp, setOtp] = useState("");
@@ -41,7 +45,10 @@ export function VerifyEmail() {
     setError("");
     setIsResending(true);
     try {
-      await authAPI.resendOtp({ email: emailParam, purpose: "signup" });
+      const res = (await authAPI.resendOtp({ email: emailParam, purpose: "signup" })) as {
+        dev_otp?: string;
+      };
+      if (res.dev_otp) setDevOtpFallback(res.dev_otp);
       startCooldown(COOLDOWN_DEFAULT);
     } catch (err: any) {
       if (err.code === "COOLDOWN" && typeof err.retry_after === "number") {
@@ -107,6 +114,12 @@ export function VerifyEmail() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8">
+          {devOtpHint && (
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <strong>Development:</strong> email was not sent from the server. Use this code:{" "}
+              <span className="font-mono font-bold tracking-widest">{devOtpHint}</span>
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm text-gray-700 mb-2">Verification code</label>

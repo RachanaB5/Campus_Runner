@@ -34,13 +34,17 @@ app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your-secret-key-change-in-production')
 
-# Email Configuration
+# Email Configuration (MAIL_* is canonical; EMAIL_ADDRESS / EMAIL_PASSWORD match backend/.env.example)
+_mail_user = (os.getenv('MAIL_USERNAME') or os.getenv('EMAIL_ADDRESS', '')).strip()
+# Gmail app passwords are often pasted with spaces; SMTP expects 16 chars without spaces
+_mail_pass = (os.getenv('MAIL_PASSWORD') or os.getenv('EMAIL_PASSWORD', '')).replace(' ', '').strip()
 app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
 app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
 app.config['MAIL_USE_TLS'] = os.getenv('MAIL_USE_TLS', 'True') == 'True'
-app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME', '')
-app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD', '')
-app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER', 'noreply@campusrunner.com')
+app.config['MAIL_USERNAME'] = _mail_user
+app.config['MAIL_PASSWORD'] = _mail_pass
+_default_sender = (os.getenv('MAIL_DEFAULT_SENDER', '') or _mail_user or 'noreply@campusrunner.com').strip()
+app.config['MAIL_DEFAULT_SENDER'] = _default_sender
 
 # Initialize extensions
 from models import db

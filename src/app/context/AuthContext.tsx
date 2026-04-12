@@ -31,6 +31,8 @@ interface AuthContextType {
     requires_verification?: boolean;
     access_token?: string;
     user?: User;
+    email_sent?: boolean;
+    dev_otp?: string;
   }>;
   verifySignupOtp: (email: string, otp: string) => Promise<void>;
   logout: () => Promise<void>;
