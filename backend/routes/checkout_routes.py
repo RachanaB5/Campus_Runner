@@ -246,7 +246,23 @@ def confirm_checkout():
                 order_details=order.to_dict(),
                 total_amount=order.total_amount,
                 estimated_delivery_time=order.estimated_delivery_time.strftime('%I:%M %p') if order.estimated_delivery_time else 'N/A',
-                app=flask_app
+                app=flask_app,
+                otp_details=[
+                    {
+                        'label': 'Pickup OTP',
+                        'value': pickup_otp.otp,
+                        'hint': 'Show this code when the runner collects the order from the canteen.',
+                        'accent': '#EA580C',
+                        'surface': '#FFF7ED',
+                    },
+                    {
+                        'label': 'Delivery OTP',
+                        'value': delivery_otp.otp,
+                        'hint': 'Share this code only when the runner asks for delivery verification.',
+                        'accent': '#16A34A',
+                        'surface': '#F0FDF4',
+                    },
+                ],
             )
             
             # Send order notification to admin

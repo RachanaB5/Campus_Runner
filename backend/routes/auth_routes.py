@@ -38,19 +38,16 @@ def _dev_mode_expose_otp():
 def dispatch_otp_email(to_email, otp, purpose):
     """Send OTP synchronously so SMTP errors are visible. Returns (sent, error_or_none)."""
     from app import app
-    from utils import send_otp_email_sync
+    from utils import build_otp_email_html, send_otp_email_sync
 
-    subject = f'CampusRunner {purpose} OTP'
-    html = f"""
-        <html>
-          <body style="font-family: Arial, sans-serif;">
-            <h2 style="color:#F97316;">CampusRunner Verification</h2>
-            <p>Your {purpose.lower()} OTP is:</p>
-            <h1 style="letter-spacing:6px;color:#EA580C;">{otp}</h1>
-            <p>This code expires in 10 minutes.</p>
-          </body>
-        </html>
-        """
+    html = build_otp_email_html(otp, purpose)
+    subject = {
+        'profile_signup': 'Verify Your Campus Runner Account',
+        'profile_password_reset': 'Reset Your Campus Runner Password',
+        'profile_update': 'Confirm Your Profile Update',
+        'order_pickup': 'Pickup Verification Code for Your Order',
+        'order_delivery': 'Delivery Verification Code for Your Order',
+    }.get(purpose, 'Campus Runner Verification Code')
     return send_otp_email_sync(app, subject, [to_email], html, otp_for_log=otp)
 
 @auth_bp.route('/register', methods=['POST'])
@@ -113,7 +110,7 @@ def register():
             'expires_at': now + timedelta(minutes=10),
             'last_sent_at': now,
         }
-        sent, _mail_err = dispatch_otp_email(user.email, otp, 'Signup Verification')
+        sent, _mail_err = dispatch_otp_email(user.email, otp, 'profile_signup')
 
         body = {
             'message': 'User registered successfully. Check your email for the verification code.'
@@ -213,7 +210,7 @@ def resend_otp():
         'expires_at': now + timedelta(minutes=10),
         'last_sent_at': now,
     }
-    label = 'Signup Verification' if purpose == 'signup' else 'Password Reset'
+    label = 'profile_signup' if purpose == 'signup' else 'profile_password_reset'
     sent, _ = dispatch_otp_email(email, otp, label)
     payload = {'message': 'OTP sent' if sent else 'OTP generated but email was not sent', 'email_sent': sent}
     if not sent and _dev_mode_expose_otp():
@@ -251,7 +248,7 @@ def forgot_password():
         'expires_at': now + timedelta(minutes=10),
         'last_sent_at': now,
     }
-    sent, _ = dispatch_otp_email(email, otp, 'Password Reset')
+    sent, _ = dispatch_otp_email(email, otp, 'profile_password_reset')
     payload = {
         'message': 'Password reset OTP sent' if sent else 'Password reset code generated but email was not sent.',
         'email_sent': sent,
