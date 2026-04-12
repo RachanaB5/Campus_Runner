@@ -11,7 +11,7 @@ def test_register_creates_unverified_user_and_otp(client):
 
     assert response.status_code == 201
     payload = response.get_json()
-    assert payload["access_token"]
+    assert payload["message"] == "User registered successfully. Please verify your email."
     assert payload["user"]["is_verified"] is False
 
     user = User.query.filter_by(email="aarav@rvu.edu.in").first()
