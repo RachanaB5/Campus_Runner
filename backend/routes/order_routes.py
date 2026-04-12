@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import db, Order, OrderItem, User, Food, Delivery, RewardPoints, RewardTransaction, Review, OrderOTP, Runner
 from datetime import datetime, timedelta
+from utils import send_runner_otp_notification
 import uuid
 
 order_bp = Blueprint('order', __name__)
@@ -125,6 +126,21 @@ def create_order():
         db.session.add(delivery)
         db.session.add(order)
         db.session.commit()
+        
+        # Send runner OTP notification if runner was assigned
+        if runner and order.pickup_otp and order.delivery_otp:
+            from app import app as flask_app
+            runner_user = User.query.get(runner.user_id) or runner
+            send_runner_otp_notification(
+                runner_email=runner_user.email,
+                runner_name=runner_user.name,
+                order_number=order.order_number,
+                pickup_otp=order.pickup_otp.otp,
+                delivery_otp=order.delivery_otp.otp,
+                pickup_location='Main Canteen',  # Update based on your canteen info
+                delivery_address=order.delivery_address,
+                app=flask_app
+            )
         
         return jsonify({
             'message': 'Order created successfully',

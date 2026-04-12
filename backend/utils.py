@@ -1104,3 +1104,100 @@ def save_order_invoice_pdf(user_name, order_number, order_details, total_amount,
     except Exception as e:
         print(f"❌ Error saving PDF: {str(e)}")
         return False
+
+
+def send_runner_otp_notification(runner_email, runner_name, order_number, pickup_otp, delivery_otp, pickup_location, delivery_address, app=None):
+    """Send OTP codes to assigned runner (separate from customer email)"""
+    try:
+        if app is None:
+            from app import app as flask_app
+            app = flask_app
+        
+        safe_runner = escape((runner_name or 'Runner').strip())
+        safe_order = escape(str(order_number))
+        safe_pickup = escape(str(pickup_location or 'Canteen'))
+        safe_delivery = escape(str(delivery_address or 'Delivery Address'))
+        
+        html = f"""
+        <html>
+            <body style="margin:0; padding:0; background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%); font-family: Arial, Helvetica, sans-serif; color:#0f172a;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%); padding: 32px 12px;">
+                    <tr>
+                        <td align="center">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 680px; background: #ffffff; border-radius: 28px; overflow: hidden; box-shadow: 0 18px 48px rgba(15, 23, 42, 0.12); border: 1px solid rgba(15, 23, 42, 0.06);">
+                                <tr>
+                                    <td style="background: linear-gradient(135deg, #0EA5A4 0%, #0891B2 100%); padding: 28px 32px; color:#ffffff;">
+                                        <div style="font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.9; margin-bottom: 10px;">Order Pickup Assignment</div>
+                                        <div style="font-size: 30px; font-weight: 800; line-height: 1.2; margin-bottom: 8px;">New Order #{safe_order}</div>
+                                        <div style="font-size: 15px; line-height: 1.6; max-width: 540px; opacity: 0.95;">You have been assigned to pick up and deliver this order. Use the OTP codes below for verification.</div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 32px; background: #ffffff;">
+                                        <div style="margin-bottom: 18px; font-size: 16px; line-height: 1.7; color:#334155;">
+                                            Hi <strong style="color:#0f172a;">{safe_runner}</strong>,
+                                            <br />
+                                            You have been assigned order #{safe_order}. Please use the OTP codes below when collecting the order from the canteen and when delivering to the customer.
+                                        </div>
+
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 24px 0;">
+                                            <tr>
+                                                <td style="padding: 20px 16px; background: #FEF3C7; border: 2px solid #F59E0B; border-radius: 20px; margin-bottom: 16px;">
+                                                    <div style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #92400E; font-weight: 800; margin-bottom: 8px;">Pickup OTP - From Canteen</div>
+                                                    <div style="font-size: 48px; letter-spacing: 0.08em; font-weight: 900; color: #F59E0B; font-family: monospace;">{escape(str(pickup_otp))}</div>
+                                                    <div style="font-size: 13px; color: #78350F; line-height: 1.6; margin-top: 12px;">Pickup Location: {safe_pickup}</div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 20px 16px; background: #D1FAE5; border: 2px solid #10B981; border-radius: 20px;">
+                                                    <div style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #065F46; font-weight: 800; margin-bottom: 8px;">Delivery OTP - To Customer</div>
+                                                    <div style="font-size: 48px; letter-spacing: 0.08em; font-weight: 900; color: #10B981; font-family: monospace;">{escape(str(delivery_otp))}</div>
+                                                    <div style="font-size: 13px; color: #047857; line-height: 1.6; margin-top: 12px;">Delivery Address: {safe_delivery}</div>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 24px 0;">
+                                            <tr>
+                                                <td style="padding: 18px 16px; background: #f8fafc; border-radius: 18px; border: 1px solid rgba(15, 23, 42, 0.06);">
+                                                    <div style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #64748b; font-weight: 800; margin-bottom: 8px;">Your Responsibilities</div>
+                                                    <div style="font-size: 14px; line-height: 1.8; color: #334155;">
+                                                        1. Navigate to pickup location<br/>
+                                                        2. Enter Pickup OTP {escape(str(pickup_otp))} at canteen<br/>
+                                                        3. Collect the order securely<br/>
+                                                        4. Navigate to delivery address<br/>
+                                                        5. Enter Delivery OTP {escape(str(delivery_otp))} with customer
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <div style="margin-top: 20px; font-size: 13px; line-height: 1.7; color:#64748b;">
+                                            Track this order in your runner dashboard. Questions? Contact support immediately.
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 18px 32px 28px 32px; background: #ffffff; border-top: 1px solid rgba(15, 23, 42, 0.06);">
+                                        <div style="font-size: 12px; line-height: 1.7; color:#94a3b8; text-align:center;">
+                                            Campus Runner - Delivery Network Operations
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </body>
+        </html>
+        """
+        
+        subject = f"New Pickup Assignment: Order #{order_number} - Campus Runner"
+        send_email_in_background(app, subject, [runner_email], html)
+        print(f"✓ Runner OTP notification queued for {runner_email}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error sending runner OTP: {str(e)}")
+        print(f"📍 Traceback: {traceback.format_exc()}")
+        return False
