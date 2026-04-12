@@ -3,6 +3,8 @@ import { Flame, Minus, Plus, X } from "lucide-react";
 import { api } from "../services/api";
 import { useCart } from "../context/CartContext";
 import { StarRating } from "./StarRating";
+import { ImageWithFallback } from "./figma/ImageWithFallback";
+import { getFoodImageUrl } from "../utils/foodImages";
 
 interface FoodDetailModalProps {
   foodId: string | null;
@@ -34,7 +36,7 @@ export function FoodDetailModal({ foodId, open, onClose }: FoodDetailModalProps)
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50">
       <div className="w-full max-w-4xl max-h-[92vh] overflow-y-auto rounded-t-3xl md:rounded-3xl bg-white shadow-2xl">
         <div className="relative">
-          <img src={food.image_url} alt={food.name} className="h-64 w-full object-cover" />
+          <ImageWithFallback src={getFoodImageUrl(food.image_url, food.category)} alt={food.name} className="h-64 w-full object-cover" />
           <button type="button" onClick={onClose} className="absolute top-4 right-4 rounded-full bg-white/90 p-2">
             <X className="w-5 h-5" />
           </button>

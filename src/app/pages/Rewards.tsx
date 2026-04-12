@@ -9,8 +9,6 @@ export function Rewards() {
   const [totalOrders, setTotalOrders] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [redeemingId, setRedeemingId] = useState<number | null>(null);
-  const [userRole, setUserRole] = useState<string>("customer");
-
   useEffect(() => {
     fetchRewardData();
   }, []);

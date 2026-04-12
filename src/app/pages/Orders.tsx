@@ -1,8 +1,9 @@
-import { Clock, CheckCircle, Package, Bike, Phone, MapPin, User } from "lucide-react";
+import { Clock, CheckCircle, Phone, MapPin, User } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
 import { api } from "../services/api";
 import { RateOrderSheet } from "../components/RateOrderSheet";
+import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 
 export function Orders() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -153,7 +154,7 @@ export function Orders() {
                         <div className="flex items-start justify-between">
                           <div className="flex items-center gap-3">
                             {delivery.runner_image ? (
-                              <img src={delivery.runner_image} alt={delivery.runner_name} className="w-12 h-12 rounded-full object-cover" />
+                              <ImageWithFallback src={delivery.runner_image} alt={delivery.runner_name} className="w-12 h-12 rounded-full object-cover" />
                             ) : (
                               <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
                                 <User className="w-6 h-6 text-orange-600" />

@@ -36,7 +36,7 @@ export function AddToCartButton({
       await addToCart(String(foodId), quantity);
       setMessage({ type: 'success', text: 'Added to cart!' });
       setTimeout(() => setMessage(null), 2000);
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'Failed to add to cart' });
       setTimeout(() => setMessage(null), 3000);
     } finally {

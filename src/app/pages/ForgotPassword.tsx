@@ -16,6 +16,8 @@ export function ForgotPassword() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  const [message, setMessage] = useState("");
+  const [devOtp, setDevOtp] = useState("");
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -30,6 +32,7 @@ export function ForgotPassword() {
   const sendResetEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setMessage("");
     const normalized = email.trim().toLowerCase();
     if (!validateEmail(normalized)) {
       setError("Please use your RV University email (@rvu.edu.in)");
@@ -37,8 +40,10 @@ export function ForgotPassword() {
     }
     setIsLoading(true);
     try {
-      await authAPI.forgotPassword(normalized);
+      const response = await authAPI.forgotPassword(normalized) as { email_sent?: boolean; dev_otp?: string; message?: string };
       setEmail(normalized);
+      setDevOtp(response.dev_otp || "");
+      setMessage(response.email_sent ? "Reset code sent to your email." : (response.message || "Reset code generated, but email could not be sent."));
       setCooldown(COOLDOWN_DEFAULT);
       setStep("otp");
     } catch (err: any) {
@@ -54,9 +59,12 @@ export function ForgotPassword() {
   const resendOtp = async () => {
     if (cooldown > 0 || !email) return;
     setError("");
+    setMessage("");
     setIsLoading(true);
     try {
-      await authAPI.resendOtp({ email, purpose: "password_reset" });
+      const response = await authAPI.resendOtp({ email, purpose: "password_reset" }) as { email_sent?: boolean; dev_otp?: string; message?: string };
+      setDevOtp(response.dev_otp || "");
+      setMessage(response.email_sent ? "Reset code resent to your email." : (response.message || "Reset code regenerated, but email could not be sent."));
       setCooldown(COOLDOWN_DEFAULT);
     } catch (err: any) {
       if (err.code === "COOLDOWN" && typeof err.retry_after === "number") {
@@ -116,6 +124,13 @@ export function ForgotPassword() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8">
+          {message && (
+            <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              <p>{message}</p>
+              {devOtp && <p className="mt-1">Development code: <span className="font-mono font-bold tracking-widest">{devOtp}</span></p>}
+            </div>
+          )}
+
           {step === "email" && (
             <form onSubmit={sendResetEmail} className="space-y-4">
               <div>

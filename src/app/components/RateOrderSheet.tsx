@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { api } from "../services/api";
 import { StarRating } from "./StarRating";
+import { ImageWithFallback } from "./figma/ImageWithFallback";
+import { getFoodImageUrl } from "../utils/foodImages";
 
 interface RateOrderSheetProps {
   orderId: string | null;
@@ -79,7 +81,7 @@ export function RateOrderSheet({ orderId, open, onClose, onSubmitted }: RateOrde
           {items.map((item) => (
             <div key={item.food_id} className="rounded-2xl border border-orange-100 p-4">
               <div className="flex items-center gap-3">
-                {item.image_url && <img src={item.image_url} alt={item.food_name} className="w-14 h-14 rounded-xl object-cover" />}
+                <ImageWithFallback src={getFoodImageUrl(item.image_url, item.category)} alt={item.food_name} className="w-14 h-14 rounded-xl object-cover" />
                 <div>
                   <p className="font-semibold text-gray-900">{item.food_name}</p>
                   <p className="text-sm text-gray-500">Qty {item.quantity}</p>

@@ -201,24 +201,24 @@ export function PaymentMethodSelector({ amount, isLoading, disabled, savedMethod
         </div>
       )}
 
-      {!selectedSavedMethodId && (
-      <div className="mt-6 overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 via-orange-400 to-amber-300 p-5 text-white perspective-1000">
+      {method === "card" && !selectedSavedMethodId && (
+      <div className="mt-6 overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-700 to-slate-600 p-5 text-white perspective-1000">
         <div className={`relative min-h-44 transition-transform duration-500 [transform-style:preserve-3d] ${isCardBackVisible ? "[transform:rotateY(180deg)]" : ""}`}>
           <div className="absolute inset-0 [backface-visibility:hidden]">
             <div className="flex items-start justify-between">
-              <p className="text-xs uppercase tracking-[0.3em] text-orange-100">{method === "card" ? cardBrand : "CampusRunner Pay"}</p>
-              <Lock className="w-5 h-5 text-orange-50" />
+              <p className="text-xs uppercase tracking-[0.3em] text-slate-200">{cardBrand || "Card"}</p>
+              <Lock className="w-5 h-5 text-slate-100" />
             </div>
             <div className="mt-10 text-2xl font-semibold tracking-[0.2em]">
               {formatCardNumber(cardNumber || "4242424242424242")}
             </div>
             <div className="mt-8 flex items-end justify-between">
               <div>
-                <p className="text-[10px] uppercase tracking-[0.3em] text-orange-100">Card Holder</p>
-                <p className="mt-1 font-semibold">{cardHolderName || "Campus Runner"}</p>
+                <p className="text-[10px] uppercase tracking-[0.3em] text-slate-200">Card Holder</p>
+                <p className="mt-1 font-semibold">{cardHolderName || "Cardholder Name"}</p>
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-[0.3em] text-orange-100">Expiry</p>
+                <p className="text-[10px] uppercase tracking-[0.3em] text-slate-200">Expiry</p>
                 <p className="mt-1 font-semibold">{cardExpiry || "08/2027"}</p>
               </div>
             </div>

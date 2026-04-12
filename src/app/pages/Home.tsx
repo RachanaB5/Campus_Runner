@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, ShoppingCart, X, Plus, Minus, Trash2, ArrowRight, Leaf, Bike, MapPin, Clock } from "lucide-react";
+import { Search, ShoppingCart, X, Plus, Minus, Trash2, ArrowRight, Bike, MapPin } from "lucide-react";
 import { menuItems } from "../data/mockData";
 import { FoodCard } from "../components/FoodCard";
 import { FoodDetailModal } from "../components/FoodDetailModal";
@@ -78,7 +78,6 @@ export function Home() {
 
   const {
     cart,
-    addToCart,
     removeFromCart,
     updateCartItem,
     isLoading: cartLoading,

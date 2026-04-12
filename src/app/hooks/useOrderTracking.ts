@@ -33,7 +33,9 @@ export function useOrderTracking(orderId: string, initialTracking?: any) {
     };
 
     socket.on("order_status_update", handleUpdate);
-    return () => socket.off("order_status_update", handleUpdate);
+    return () => {
+      socket.off("order_status_update", handleUpdate);
+    };
   }, [initialTracking, orderId]);
 
   return tracking;
