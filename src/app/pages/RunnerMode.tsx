@@ -5,6 +5,7 @@ import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { useSocket } from "../hooks/useSocket";
 import { RunnerOrderCard } from "../components/RunnerOrderCard";
+import { useRunnerState } from "../hooks/useRunnerState";
 
 interface RunnerOrder {
   id: string;
@@ -45,10 +46,10 @@ export function RunnerMode() {
   const { isLoggedIn, user } = useAuth();
   const navigate = useNavigate();
   const socket = useSocket(isLoggedIn);
+  const runner = useRunnerState();
 
   const [availableOrders, setAvailableOrders] = useState<RunnerOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isOnline, setIsOnline] = useState(false);
   const [isTogglingOnline, setIsTogglingOnline] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState("");
@@ -117,11 +118,9 @@ export function RunnerMode() {
 
     try {
       const profile = await api.getRunnerProfile();
-      setIsOnline(Boolean(profile.is_available));
       setRunnerDeliveries(profile.total_deliveries ?? 0);
       setRunnerEarnings(profile.total_earnings ?? 0);
     } catch {
-      setIsOnline(false);
       setRunnerDeliveries(0);
       setRunnerEarnings(0);
     }
@@ -142,7 +141,6 @@ export function RunnerMode() {
     const handleRunnerStatusChanged = async (event: Event) => {
       const detail = (event as CustomEvent<{ isOnline?: boolean }>).detail || {};
       if (typeof detail.isOnline === "boolean") {
-        setIsOnline(detail.isOnline);
         if (detail.isOnline) {
           await fetchAvailableOrders();
         } else {
@@ -195,31 +193,23 @@ export function RunnerMode() {
     socket.on("new_order_available", handleNewOrder);
     socket.on("order_taken", handleOrderTaken);
 
-    if (isOnline) {
-      socket.emit("runner_online");
+    if (runner.isAvailable) {
+      socket.emit("runner_go_online", { token: localStorage.getItem("access_token") });
     }
 
     return () => {
       socket.off("new_order_available", handleNewOrder);
       socket.off("order_taken", handleOrderTaken);
-      if (isOnline) {
-        socket.emit("runner_offline");
+      if (runner.isAvailable) {
+        socket.emit("runner_go_offline", { token: localStorage.getItem("access_token") });
       }
     };
-  }, [isLoggedIn, isOnline, socket]);
+  }, [isLoggedIn, runner.isAvailable, socket]);
 
   const toggleOnline = async () => {
     setIsTogglingOnline(true);
     try {
-      const response = await api.toggleRunnerAvailability();
-      const nextOnline = Boolean(response.runner?.is_available ?? response.is_available);
-      setIsOnline(nextOnline);
-      if (socket) {
-        socket.emit(nextOnline ? "runner_online" : "runner_offline");
-      }
-      window.dispatchEvent(new CustomEvent("runner:status-changed", {
-        detail: { isOnline: nextOnline, hasRunnerProfile: true },
-      }));
+      const nextOnline = await runner.toggle();
       if (nextOnline) {
         await fetchAvailableOrders();
       } else {
@@ -239,16 +229,8 @@ export function RunnerMode() {
   const acceptOrder = async (orderId: string) => {
     setAcceptingOrderId(orderId);
     try {
-      if (!isOnline) {
-        const response = await api.toggleRunnerAvailability();
-        const nextOnline = Boolean(response.runner?.is_available ?? response.is_available ?? true);
-        setIsOnline(nextOnline);
-        if (socket) {
-          socket.emit(nextOnline ? "runner_online" : "runner_offline");
-        }
-        window.dispatchEvent(new CustomEvent("runner:status-changed", {
-          detail: { isOnline: nextOnline, hasRunnerProfile: true },
-        }));
+      if (!runner.isAvailable) {
+        const nextOnline = await runner.toggle(true);
         if (nextOnline) {
           await fetchAvailableOrders();
         }
@@ -316,13 +298,13 @@ export function RunnerMode() {
             onClick={toggleOnline}
             disabled={isTogglingOnline}
             className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold shadow-lg transition-all ${
-              isOnline
+              runner.isAvailable
                 ? "bg-gradient-to-r from-emerald-500 to-green-600 text-white"
                 : "bg-white text-gray-800 border border-orange-200"
             }`}
           >
             <Power className="w-4 h-4" />
-            {isTogglingOnline ? "Updating..." : isOnline ? "Go Offline" : "Go Online"}
+            {isTogglingOnline ? "Updating..." : runner.isAvailable ? "Go Offline" : "Go Online"}
           </button>
         </div>
 
@@ -369,10 +351,10 @@ export function RunnerMode() {
               <div className="rounded-2xl border border-dashed border-orange-200 bg-white p-10 text-center">
                 <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto mb-4" />
                 <p className="font-semibold text-gray-900">
-                  {isOnline ? "No open runner orders right now" : "Runner Mode is currently off"}
+                  {runner.isAvailable ? "No open runner orders right now" : "Runner Mode is currently off"}
                 </p>
                 <p className="text-sm text-gray-500 mt-2">
-                  {runnerQueueMessage || (isOnline
+                  {runnerQueueMessage || (runner.isAvailable
                     ? "Stay online and we’ll push the next confirmed order here instantly."
                     : "Switch on Runner Mode to receive delivery requests.")}
                 </p>

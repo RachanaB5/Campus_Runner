@@ -276,6 +276,10 @@ export const runnerAPI = {
     return apiRequest('/runner/profile');
   },
 
+  getRunnerStatus: async () => {
+    return apiRequest('/runner/status');
+  },
+
   updateLocation: async (latitude: number, longitude: number) => {
     return apiRequest('/runner/update-location', {
       method: 'POST',
@@ -286,6 +290,15 @@ export const runnerAPI = {
   toggleAvailability: async () => {
     return apiRequest('/runner/toggle-availability', {
       method: 'POST',
+    });
+  },
+
+  setRunnerAvailability: async (isAvailable?: boolean) => {
+    return apiRequest('/runner/toggle', {
+      method: 'PUT',
+      body: JSON.stringify(
+        isAvailable == null ? {} : { is_available: isAvailable },
+      ),
     });
   },
 
@@ -612,8 +625,10 @@ export const api = {
   // Runner methods
   registerAsRunner: runnerAPI.registerAsRunner,
   getRunnerProfile: runnerAPI.getRunnerProfile,
+  getRunnerStatus: runnerAPI.getRunnerStatus,
   updateLocation: runnerAPI.updateLocation,
   toggleRunnerAvailability: runnerAPI.toggleAvailability,
+  setRunnerAvailability: runnerAPI.setRunnerAvailability,
   getAvailableOrders: runnerAPI.getAvailableOrders,
   getRunnerActiveDelivery: runnerAPI.getActiveDelivery,
   acceptOrder: runnerAPI.acceptOrder,

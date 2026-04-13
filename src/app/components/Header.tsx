@@ -6,58 +6,22 @@ import { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { NotificationBell } from "./NotificationBell";
 import { RunnerActiveDeliveryPanel } from "./RunnerActiveDeliveryPanel";
+import { useRunnerState } from "../hooks/useRunnerState";
 
 export function Header() {
   const location = useLocation();
   const { isLoggedIn, user } = useAuth();
   const { getTotalItems } = useCart();
-  const [isRunnerMode, setIsRunnerMode] = useState(false);
-  const [hasRunnerProfile, setHasRunnerProfile] = useState(false);
+  const runner = useRunnerState();
   const [isTogglingRunner, setIsTogglingRunner] = useState(false);
   const [activeDelivery, setActiveDelivery] = useState<any | null>(null);
   const [showDeliveryPanel, setShowDeliveryPanel] = useState(false);
 
   useEffect(() => {
     if (!isLoggedIn) {
-      setIsRunnerMode(false);
-      setHasRunnerProfile(false);
       return;
     }
-
-    let isMounted = true;
-    api.getRunnerProfile()
-      .then((runner) => {
-        if (isMounted) {
-          setHasRunnerProfile(Boolean(runner?.id));
-          setIsRunnerMode(Boolean(runner?.is_available));
-        }
-      })
-      .catch(() => {
-        if (isMounted) {
-          setHasRunnerProfile(false);
-          setIsRunnerMode(false);
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
   }, [isLoggedIn]);
-
-  useEffect(() => {
-    const handleRunnerStatusChanged = (event: Event) => {
-      const detail = (event as CustomEvent<{ isOnline?: boolean; hasRunnerProfile?: boolean }>).detail || {};
-      if (typeof detail.hasRunnerProfile === "boolean") {
-        setHasRunnerProfile(detail.hasRunnerProfile);
-      }
-      if (typeof detail.isOnline === "boolean") {
-        setIsRunnerMode(detail.isOnline);
-      }
-    };
-
-    window.addEventListener("runner:status-changed", handleRunnerStatusChanged as EventListener);
-    return () => window.removeEventListener("runner:status-changed", handleRunnerStatusChanged as EventListener);
-  }, []);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -112,32 +76,13 @@ export function Header() {
   const handleRunnerToggle = async () => {
     try {
       setIsTogglingRunner(true);
-
-      let hasRunnerProfile = false;
-      try {
-        const runnerProfile = await api.getRunnerProfile();
-        hasRunnerProfile = Boolean(runnerProfile?.id);
-      } catch {
-        hasRunnerProfile = false;
-      }
-
-      if (!hasRunnerProfile) {
+      if (!runner.isRunner) {
         await api.registerAsRunner({
           vehicle_type: "bike",
           license_number: `DL-${Date.now()}`,
         });
-        setHasRunnerProfile(true);
-        window.dispatchEvent(new CustomEvent("runner:status-changed", {
-          detail: { hasRunnerProfile: true, isOnline: false },
-        }));
       }
-
-      const response = await api.toggleRunnerAvailability();
-      const nextAvailability = Boolean(response?.runner?.is_available);
-      setIsRunnerMode(nextAvailability);
-      window.dispatchEvent(new CustomEvent("runner:status-changed", {
-        detail: { hasRunnerProfile: true, isOnline: nextAvailability },
-      }));
+      const nextAvailability = await runner.toggle();
       alert(
         nextAvailability
           ? "You are now available for deliveries"
@@ -181,19 +126,19 @@ export function Header() {
                   onClick={handleRunnerToggle}
                   disabled={isTogglingRunner}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                    isRunnerMode
+                    runner.isAvailable
                       ? 'bg-orange-50 text-orange-600'
                       : 'text-gray-600 hover:text-orange-600'
                   } disabled:opacity-50`}
-                  title={isRunnerMode ? "Runner Mode Active" : "Click to Enable Runner Mode"}
+                  title={runner.isAvailable ? "Runner Mode Active" : "Click to Enable Runner Mode"}
                 >
                   <Bike className="w-5 h-5" />
                   <span>Runner Mode</span>
-                  {isRunnerMode && (
+                  {runner.isAvailable && (
                     <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                   )}
                 </button>
-                {hasRunnerProfile && (
+                {runner.isRunner && (
                   <Link
                     to="/runner"
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
@@ -299,16 +244,16 @@ export function Header() {
                 onClick={handleRunnerToggle}
                 disabled={isTogglingRunner}
                 className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg ${
-                  isRunnerMode ? 'text-orange-600' : 'text-gray-600'
+                  runner.isAvailable ? 'text-orange-600' : 'text-gray-600'
                 } disabled:opacity-50`}
               >
                 <Bike className="w-5 h-5" />
                 <span className="text-xs">Runner</span>
-                {isRunnerMode && (
+                {runner.isAvailable && (
                   <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
                 )}
               </button>
-              {hasRunnerProfile && (
+              {runner.isRunner && (
                 <Link 
                   to="/runner" 
                   className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg ${
