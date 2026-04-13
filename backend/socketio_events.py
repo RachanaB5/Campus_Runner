@@ -39,6 +39,9 @@ def register_socketio_events(socketio):
             user_id = _get_socket_user_id()
         if user_id:
             join_room(f'user:{user_id}')
+            runner = Runner.query.filter_by(user_id=user_id, is_available=True).first()
+            if runner:
+                join_room('runners_online')
 
     @socketio.on('join_user_room')
     def handle_join_user_room(data=None):
@@ -59,6 +62,10 @@ def register_socketio_events(socketio):
             db.session.commit()
         socketio.emit('runner_status', {'status': 'online'}, room=f'user:{user_id}')
 
+    @socketio.on('runner_go_online')
+    def handle_runner_go_online(data=None):
+        handle_runner_online(data)
+
     @socketio.on('runner_offline')
     def handle_runner_offline(data=None):
         user_id = _get_socket_user_id()
@@ -72,13 +79,10 @@ def register_socketio_events(socketio):
             db.session.commit()
         socketio.emit('runner_status', {'status': 'offline'}, room=f'user:{user_id}')
 
+    @socketio.on('runner_go_offline')
+    def handle_runner_go_offline(data=None):
+        handle_runner_offline(data)
+
     @socketio.on('disconnect')
     def handle_disconnect():
-        user_id = _get_socket_user_id()
-        if not user_id:
-            return
-        runner = Runner.query.filter_by(user_id=user_id).first()
-        if runner and runner.status != 'on_delivery':
-            runner.is_available = False
-            runner.status = 'offline'
-            db.session.commit()
+        return

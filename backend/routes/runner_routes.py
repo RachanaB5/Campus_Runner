@@ -9,6 +9,12 @@ from services.notification_service import notify_order_taken
 
 runner_bp = Blueprint('runner', __name__)
 
+RUNNER_VISIBLE_ORDER_STATUSES = ['pending', 'placed', 'received', 'confirmed', 'preparing', 'ready']
+
+
+def _calculate_runner_reward_points(total_amount) -> int:
+    return max(10, int(round(float(total_amount or 0) * 0.1)))
+
 
 def _format_customer_name(name: str | None) -> str:
     if not name:
@@ -170,6 +176,91 @@ def toggle_availability():
             'runner': runner.to_dict()
         }), 200
     
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@runner_bp.route('/status', methods=['GET'])
+@jwt_required()
+def get_runner_status():
+    """Single source of truth for runner availability and active delivery state."""
+    try:
+        user_id = get_jwt_identity()
+        runner = Runner.query.filter_by(user_id=user_id).first()
+
+        if not runner:
+            return jsonify({
+                'is_runner': False,
+                'is_available': False,
+                'has_active_delivery': False,
+                'active_delivery_id': None,
+                'completed_deliveries': 0,
+                'total_earnings': 0,
+                'status': 'offline',
+            }), 200
+
+        active_delivery = Delivery.query.filter(
+            Delivery.runner_id == user_id,
+            Delivery.status.in_(['assigned', 'picked_up', 'on_the_way', 'in_transit'])
+        ).order_by(Delivery.created_at.desc()).first()
+
+        return jsonify({
+            'is_runner': True,
+            'runner_id': runner.id,
+            'is_available': bool(runner.is_available),
+            'has_active_delivery': active_delivery is not None,
+            'active_delivery_id': active_delivery.id if active_delivery else None,
+            'completed_deliveries': runner.total_deliveries or 0,
+            'total_earnings': runner.total_earnings or 0,
+            'status': runner.status or ('online' if runner.is_available else 'offline'),
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@runner_bp.route('/toggle', methods=['PUT'])
+@jwt_required()
+def set_runner_availability():
+    """Explicit runner availability setter for shared frontend state."""
+    try:
+        user_id = get_jwt_identity()
+        runner = Runner.query.filter_by(user_id=user_id).first()
+
+        if not runner:
+            user = User.query.get(user_id)
+            if not user:
+                return jsonify({'error': 'User not found'}), 404
+            runner = Runner(
+                id=str(uuid.uuid4()),
+                user_id=user_id,
+                vehicle_type='bike',
+                license_number=f'AUTO-{datetime.utcnow().strftime("%Y%m%d%H%M%S")}',
+                is_available=False,
+                status='offline',
+            )
+            user.role = 'runner'
+            db.session.add(runner)
+            db.session.flush()
+
+        data = request.get_json(force=True, silent=True) or {}
+        target = data.get('is_available')
+        if target is None:
+            runner.is_available = not bool(runner.is_available)
+        else:
+            runner.is_available = bool(target)
+
+        if runner.status != 'on_delivery':
+            runner.status = 'online' if runner.is_available else 'offline'
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Runner availability updated',
+            'is_available': runner.is_available,
+            'runner': runner.to_dict(),
+        }), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -340,8 +431,26 @@ def get_available_orders():
         
         if not runner:
             return jsonify({'error': 'Runner profile not found'}), 404
+        if not runner.is_available:
+            return jsonify({
+                'orders': [],
+                'available_orders': [],
+                'count': 0,
+                'message': 'Enable Runner Mode to receive available orders',
+            }), 200
         
-        candidate_orders = Order.query.filter(Order.status.in_(['confirmed', 'preparing', 'ready'])).order_by(Order.created_at.asc()).all()
+        candidate_orders = Order.query.filter(
+            Order.status.in_(RUNNER_VISIBLE_ORDER_STATUSES)
+        ).order_by(Order.created_at.asc()).all()
+        self_excluded_orders = 0
+
+        visible_orders = [
+            order for order in candidate_orders
+            if order.customer_id != user_id
+        ]
+        self_excluded_orders = len(candidate_orders) - len(visible_orders)
+
+        candidate_orders = [order for order in visible_orders if order.status in RUNNER_VISIBLE_ORDER_STATUSES]
 
         orders_data = []
         for order in candidate_orders:
@@ -368,7 +477,7 @@ def get_available_orders():
                     })
                 first_food = order.items[0].food if order.items else None
                 counter_number = getattr(first_food, 'counter_number', None) if first_food else None
-                reward_points = max(10, int(round(float(order.total_amount or 0) * 0.1)))
+                reward_points = _calculate_runner_reward_points(order.total_amount)
                 orders_data.append({
                     'id': order.id,
                     'order_id': order.id,
@@ -396,7 +505,15 @@ def get_available_orders():
         return jsonify({
             'orders': orders_data,
             'available_orders': orders_data,
-            'count': len(orders_data)
+            'count': len(orders_data),
+            'self_excluded_orders': self_excluded_orders,
+            'message': (
+                'No other users have open orders right now.'
+                if len(orders_data) == 0 and self_excluded_orders == 0
+                else 'Your own open orders are hidden here. Switch to a different customer account to test runner acceptance.'
+                if len(orders_data) == 0 and self_excluded_orders > 0
+                else None
+            ),
         }), 200
     
     except Exception as e:
@@ -413,6 +530,8 @@ def accept_order(order_id):
 
         if not runner:
             return jsonify({'error': 'Runner profile not found'}), 404
+        if not runner.is_available:
+            return jsonify({'error': 'Enable Runner Mode before accepting orders'}), 400
 
         delivery = Delivery.query.filter_by(order_id=order_id).first()
         if not delivery:
@@ -420,12 +539,14 @@ def accept_order(order_id):
 
         locked_order = db.session.execute(
             select(Order)
-            .where(Order.id == order_id, Order.status.in_(['confirmed', 'ready']))
+            .where(Order.id == order_id, Order.status.in_(RUNNER_VISIBLE_ORDER_STATUSES))
             .with_for_update(skip_locked=True)
         ).scalar_one_or_none()
 
         if not locked_order:
             return jsonify({'error': 'Order already accepted by another runner'}), 409
+        if locked_order.customer_id == user_id:
+            return jsonify({'error': 'You cannot accept delivery for your own order'}), 403
 
         current_delivery = Delivery.query.filter_by(order_id=order_id).first()
         if current_delivery and current_delivery.runner_id:
@@ -507,7 +628,7 @@ def get_runner_order_details(order_id):
                 'image_url': item.food.image_url if item.food else None,
                 'customizations': item.customizations,
             } for item in (order.items or [])],
-            'runner_reward_points': max(10, int(round(float(order.total_amount or 0) / 15))),
+            'runner_reward_points': _calculate_runner_reward_points(order.total_amount),
             'customer_name': _format_customer_name(customer.name if customer else None),
             'customer_initial': (customer.name[:1].upper() if customer and customer.name else 'C'),
             'customer_phone': customer.phone if customer and delivery.status in ['picked_up', 'on_the_way', 'delivered'] else None,
@@ -652,7 +773,7 @@ def update_delivery_status_v2(delivery_id):
             order.delivered_at = datetime.utcnow()
             runner.total_deliveries = (runner.total_deliveries or 0) + 1
             runner.status = 'online'
-            reward_points = max(10, int(round(float(order.total_amount or 0) / 15)))
+            reward_points = _calculate_runner_reward_points(order.total_amount)
             _reward_runner(user_id, order, reward_points)
             _emit_order_status(order, 'delivered', runner_name)
         else:
@@ -663,7 +784,7 @@ def update_delivery_status_v2(delivery_id):
             'message': 'Delivery status updated',
             'delivery': delivery.to_dict(),
             'order': order.to_dict(),
-            'points_earned': max(10, int(round(float(order.total_amount or 0) / 15))) if new_status == 'delivered' else 0,
+            'points_earned': _calculate_runner_reward_points(order.total_amount) if new_status == 'delivered' else 0,
         }), 200
     except Exception as e:
         db.session.rollback()

@@ -64,6 +64,8 @@ def notify_runners_new_order(order: Order) -> None:
 
     available_runners = Runner.query.filter_by(is_available=True).all()
     for runner in available_runners:
+        if runner.user_id == order.customer_id:
+            continue
         if _wants_notification(runner.user_id, 'new_orders_available'):
             create_notification(
                 user_id=runner.user_id,

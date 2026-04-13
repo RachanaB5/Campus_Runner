@@ -190,15 +190,19 @@ export const rewardsAPI = {
     return apiRequest('/rewards/transactions');
   },
 
-  redeemPoints: async (points: number) => {
+  redeemPoints: async (points: number, voucherId?: string) => {
     return apiRequest('/rewards/redeem', {
       method: 'POST',
-      body: JSON.stringify({ points }),
+      body: JSON.stringify({ points, voucher_id: voucherId }),
     });
   },
 
   getAvailableRewards: async () => {
     return apiRequest('/rewards/available');
+  },
+
+  getRedeemedVouchers: async () => {
+    return apiRequest('/rewards/redeemed-vouchers');
   },
 
   claimDailyBonus: async () => {
@@ -272,6 +276,10 @@ export const runnerAPI = {
     return apiRequest('/runner/profile');
   },
 
+  getRunnerStatus: async () => {
+    return apiRequest('/runner/status');
+  },
+
   updateLocation: async (latitude: number, longitude: number) => {
     return apiRequest('/runner/update-location', {
       method: 'POST',
@@ -282,6 +290,15 @@ export const runnerAPI = {
   toggleAvailability: async () => {
     return apiRequest('/runner/toggle-availability', {
       method: 'POST',
+    });
+  },
+
+  setRunnerAvailability: async (isAvailable?: boolean) => {
+    return apiRequest('/runner/toggle', {
+      method: 'PUT',
+      body: JSON.stringify(
+        isAvailable == null ? {} : { is_available: isAvailable },
+      ),
     });
   },
 
@@ -372,6 +389,9 @@ export const runnerAPI = {
 
 export const getAvailableDeliveries = runnerAPI.getAvailableDeliveries;
 export const acceptDelivery = runnerAPI.acceptDelivery;
+export const getAvailableOrders = runnerAPI.getAvailableOrders;
+export const acceptOrder = runnerAPI.acceptOrder;
+export const getRunnerProfile = runnerAPI.getRunnerProfile;
 
 // Admin API
 export const adminAPI = {
@@ -599,13 +619,16 @@ export const api = {
   getRewardTransactions: rewardsAPI.getRewardTransactions,
   redeemPoints: rewardsAPI.redeemPoints,
   getAvailableRewards: rewardsAPI.getAvailableRewards,
+  getRedeemedVouchers: rewardsAPI.getRedeemedVouchers,
   claimDailyBonus: rewardsAPI.claimDailyBonus,
   
   // Runner methods
   registerAsRunner: runnerAPI.registerAsRunner,
   getRunnerProfile: runnerAPI.getRunnerProfile,
+  getRunnerStatus: runnerAPI.getRunnerStatus,
   updateLocation: runnerAPI.updateLocation,
   toggleRunnerAvailability: runnerAPI.toggleAvailability,
+  setRunnerAvailability: runnerAPI.setRunnerAvailability,
   getAvailableOrders: runnerAPI.getAvailableOrders,
   getRunnerActiveDelivery: runnerAPI.getActiveDelivery,
   acceptOrder: runnerAPI.acceptOrder,

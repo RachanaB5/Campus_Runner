@@ -13,7 +13,7 @@ export function connectSocket(token: string) {
   socket = io(SOCKET_URL, {
     auth: { token },
     query: { token },
-    transports: ["websocket", "polling"],
+    transports: ["polling", "websocket"],
   });
 
   return socket;

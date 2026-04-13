@@ -42,6 +42,8 @@ export function Checkout() {
   const [isLoading, setIsLoading] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [savedMethods, setSavedMethods] = useState<any[]>([]);
+  const [availableCoupons, setAvailableCoupons] = useState<any[]>([]);
+  const [selectedCouponCode, setSelectedCouponCode] = useState("");
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
   const [validationState, setValidationState] = useState<ValidationState>({
     address: false,
@@ -55,12 +57,25 @@ export function Checkout() {
   const totalPrice = getTotalPrice();
   const taxes = Math.round(totalPrice * 0.05 * 100) / 100;
   const deliveryFee = totalPrice > 500 ? 0 : 50;
-  const finalTotal = totalPrice + taxes + deliveryFee;
+  const selectedCoupon = availableCoupons.find((coupon) => coupon.code === selectedCouponCode);
+  const discountAmount = selectedCoupon
+    ? selectedCoupon.discount_type === "delivery"
+      ? Math.min(deliveryFee, Number(selectedCoupon.discount_value || 0))
+      : Math.min(totalPrice + deliveryFee, Number(selectedCoupon.discount_value || 0))
+    : 0;
+  const finalTotal = Math.max(0, totalPrice + taxes + deliveryFee - discountAmount);
 
   useEffect(() => {
-    api.getSavedPaymentMethods().then((response) => {
-      setSavedMethods(response.payment_methods || []);
-    }).catch(() => setSavedMethods([]));
+    Promise.all([
+      api.getSavedPaymentMethods().catch(() => ({ payment_methods: [] })),
+      api.getRedeemedVouchers().catch(() => ({ vouchers: [] })),
+    ]).then(([methodsResponse, vouchersResponse]) => {
+      setSavedMethods(methodsResponse.payment_methods || []);
+      setAvailableCoupons((vouchersResponse.vouchers || []).filter((voucher: any) => !voucher.is_used));
+    }).catch(() => {
+      setSavedMethods([]);
+      setAvailableCoupons([]);
+    });
   }, []);
 
   // Real-time validation
@@ -160,6 +175,8 @@ export function Checkout() {
         tax_amount: taxes,
         delivery_fee: deliveryFee,
         final_total: finalTotal,
+        discount_amount: discountAmount,
+        reward_code: selectedCouponCode || undefined,
       }),
     });
 
@@ -294,6 +311,7 @@ export function Checkout() {
           pickup_otp: draft.pickup_otp,
           items: cartItems,
           total: finalTotal,
+          discount_amount: discountAmount,
         },
       });
     } catch (err: any) {
@@ -555,6 +573,74 @@ export function Checkout() {
                 </div>
               </div>
 
+              {availableCoupons.length > 0 && (
+                <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-8 border border-gray-100">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                      <Shield className="w-6 h-6 text-green-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-gray-900">Apply Reward Coupon</h2>
+                      <p className="text-sm text-gray-500">Choose a coupon unlocked from Rewards and see the discount applied instantly.</p>
+                    </div>
+                  </div>
+
+                  <div className="mb-5 rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3">
+                    <p className="text-sm font-semibold text-orange-700">
+                      {selectedCoupon
+                        ? `${selectedCoupon.name} applied`
+                        : "No coupon applied yet"}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-600">
+                      {selectedCoupon
+                        ? selectedCoupon.discount_type === "delivery"
+                          ? `Delivery discount: -₹${discountAmount.toFixed(2)}`
+                          : `Order discount: -₹${discountAmount.toFixed(2)}`
+                        : "Select one redeemed coupon below to update your final amount."}
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3">
+                      <input
+                        type="radio"
+                        checked={!selectedCouponCode}
+                        onChange={() => setSelectedCouponCode("")}
+                      />
+                      <span className="text-sm font-medium text-gray-700">No coupon</span>
+                    </label>
+
+                    {availableCoupons.map((coupon) => (
+                      <label
+                        key={coupon.code}
+                        className={`flex items-start gap-3 rounded-xl px-4 py-3 transition-colors ${
+                          selectedCouponCode === coupon.code
+                            ? "border-2 border-green-400 bg-green-50"
+                            : "border border-green-100 bg-green-50"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          checked={selectedCouponCode === coupon.code}
+                          onChange={() => setSelectedCouponCode(coupon.code)}
+                        />
+                        <div>
+                          <p className="font-semibold text-gray-900">{coupon.name}</p>
+                          <p className="text-sm text-gray-600">
+                            Code: {coupon.code} • {coupon.discount_type === "delivery"
+                              ? `Free delivery up to ₹${coupon.discount_value}`
+                              : `₹${coupon.discount_value} off`}
+                          </p>
+                          <p className="mt-1 text-xs text-green-700">
+                            This changes your payable amount immediately.
+                          </p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <PaymentMethodSelector
                 amount={finalTotal}
                 isLoading={isLoading}
@@ -617,6 +703,12 @@ export function Checkout() {
                     {deliveryFee === 0 ? '✓ FREE' : `₹${deliveryFee.toFixed(2)}`}
                   </span>
                 </div>
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-green-700">
+                    <span>Coupon Discount</span>
+                    <span className="font-semibold">-₹{discountAmount.toFixed(2)}</span>
+                  </div>
+                )}
               </div>
 
               {/* Total */}
