@@ -1,122 +1,183 @@
-# CampusRunner – Smart Canteen Delivery System
+# CampusRunner
 
-CampusRunner is a real-time canteen ordering and delivery platform designed to streamline food ordering within a campus. It introduces a unique **“Runner Mode”**, allowing users to accept delivery tasks and earn rewards while ensuring fast and efficient service.
-
----
-
-## Overview
-
-CampusRunner solves common problems in campus canteens such as long queues, inefficient order handling, and lack of real-time tracking. The system enables users to place orders digitally while runners handle deliveries seamlessly.
+A real-time campus canteen ordering and delivery platform. Students can browse the menu, place orders, and track them live. A unique **Runner Mode** lets users volunteer as delivery agents and earn reward points.
 
 ---
 
-## Key Features
+## Features
 
-* **Food Ordering System** – Browse menu and place orders easily
-* **Real-Time Order Management** – Orders processed and tracked live
-* **Runner Mode** – Users can act as delivery agents and earn rewards
-* **Token System** – Digital tokens for order identification
-* **FCFS Order Handling** – Ensures fair and efficient processing
-* **Public Display System** – Shows order status in real time
-* **User Authentication** – Secure login and user management
-
----
-
-## Agile Concepts Used
-
-This project follows Agile methodology with sprint-based development.
-
-### Definition of Done (DoD)
-
-Definition of Done is the checklist that determines when a feature is complete.
-
-Example for **“Place Order Feature”**:
-
-* Code implemented successfully
-* Order stored in database
-* UI functioning properly
-* No critical bugs
-* Tested and validated
-* Integrated with other modules
-
--> Only when all conditions are satisfied → feature is considered **DONE**
-
----
-
-### Increment
-
-Increment is the working product delivered at the end of each sprint.
-
-#### Sprint 1 Increment:
-
-* User Login
-* Menu Display
-* Cart & Checkout
-* Basic Order Placement
-
-#### Sprint 2 Increment:
-
-* Payment Integration
-* Digital Token System
-* FCFS Order Handling
-* Public Order Display
-
-Each sprint delivers a usable version of the system
-
----
-
-### Difference (Quick View)
-
-| Definition of Done (DoD) | Increment              |
-| ------------------------ | ---------------------- |
-| Checklist for completion | Working product output |
-| Same for all tasks       | Changes every sprint   |
-| Ensures quality          | Shows progress         |
-
----
-
-### One-Line Summary
-
-**“Definition of Done defines when a task is complete, while Increment is the working product delivered at the end of a sprint.”**
+- **Menu & Ordering** — Browse categorized food items, add to cart, and place orders
+- **Runner Mode** — Users toggle into runner mode to accept and deliver orders, earning reward points
+- **Real-Time Tracking** — Live order status updates via Socket.IO
+- **Token System** — Digital tokens for order identification at the counter
+- **FCFS Queue** — Fair first-come-first-served order processing
+- **Payment Integration** — Razorpay with saved payment methods
+- **OTP Verification** — Delivery confirmation via OTP
+- **Admin Dashboard** — Manage menu, orders, users, and view analytics
+- **Email Notifications** — Order confirmations and OTP emails via Gmail/SMTP
 
 ---
 
 ## Tech Stack
 
-* **Frontend:** HTML, CSS, JavaScript
-* **Backend:** (Add yours: Flask / PHP / Node.js)
-* **Database:** MySQL
-* **Version Control:** Git
+| Layer     | Technology                              |
+|-----------|-----------------------------------------|
+| Frontend  | React 18, TypeScript, Vite, Tailwind CSS |
+| Backend   | Python, Flask, Flask-SocketIO           |
+| Database  | SQLite (via SQLAlchemy)                 |
+| Auth      | JWT (Flask-JWT-Extended)                |
+| Payments  | Razorpay                                |
+| Realtime  | Socket.IO                               |
+| Testing   | Pytest (backend), Vitest (frontend)     |
+| CI        | GitHub Actions                          |
 
 ---
 
-## Installation & Setup
+## Project Structure
+
+```
+Campus_Runner/
+├── backend/                  # Flask API
+│   ├── models/               # SQLAlchemy models
+│   ├── routes/               # API blueprints
+│   ├── services/             # Business logic (payments, notifications)
+│   ├── tests/                # Pytest test suite
+│   ├── app.py                # App entry point & DB init
+│   ├── seed.py               # Seed sample data
+│   ├── utils.py              # Shared utilities
+│   ├── socketio_events.py    # Socket.IO event handlers
+│   └── requirements.txt
+├── src/                      # React frontend
+│   ├── app/
+│   │   ├── components/       # Reusable UI components
+│   │   ├── context/          # Auth & Cart context
+│   │   ├── hooks/            # Custom React hooks
+│   │   ├── pages/            # Route-level page components
+│   │   └── services/         # API & Socket clients
+│   └── main.tsx
+├── .env.example              # Environment variable template
+├── .github/workflows/ci.yml  # CI pipeline
+├── package.json              # Frontend dependencies
+└── pytest.ini                # Pytest config
+```
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.11+
+- Node.js 20+
+- npm
+
+### 1. Clone the repo
 
 ```bash
 git clone https://github.com/your-username/campusrunner.git
 cd campusrunner
 ```
 
-Install dependencies (if applicable):
+### 2. Configure environment
 
 ```bash
-pip install -r requirements.txt
+cp .env.example .env
 ```
 
-Run the application:
+Edit `.env` and fill in your values (JWT secret, Razorpay keys, email credentials). See `.env.example` for all available options.
+
+### 3. Start the backend
 
 ```bash
+cd backend
+pip install -r requirements.txt
 python app.py
-```  
+```
 
+The API runs at `http://localhost:5000`. The database and a default admin account are created automatically on first run.
+
+> Default admin: `admin@rvu.edu.in` / `admin@123`
+
+### 4. Start the frontend
+
+```bash
+# from project root
+npm install
+npm run dev
+```
+
+The frontend runs at `http://localhost:5173`.
 
 ---
 
-## Future Enhancements
+## Running Tests
 
-* AI-based delivery optimization
-* Real-time GPS tracking
-* Personalized food recommendations
-* Admin analytics dashboard
-* Mobile app integration
+**Backend**
+```bash
+cd backend
+pytest
+```
 
+**Frontend**
+```bash
+npm test
+```
+
+---
+
+## API Overview
+
+| Prefix                  | Description              |
+|-------------------------|--------------------------|
+| `POST /api/auth/*`      | Register, login, OTP     |
+| `GET  /api/menu/*`      | Browse food items        |
+| `POST /api/cart/*`      | Manage cart              |
+| `POST /api/order/*`     | Place & track orders     |
+| `POST /api/checkout/*`  | Checkout flow            |
+| `POST /api/payment/*`   | Razorpay payment         |
+| `GET  /api/runner/*`    | Runner mode endpoints    |
+| `GET  /api/rewards/*`   | Reward points            |
+| `GET  /api/admin/*`     | Admin management         |
+| `GET  /api/health`      | Health check             |
+
+---
+
+## Environment Variables
+
+See `.env.example` for the full list. Key variables:
+
+| Variable              | Description                        |
+|-----------------------|------------------------------------|
+| `JWT_SECRET_KEY`      | Secret for signing JWT tokens      |
+| `DATABASE_URL`        | SQLite path (default: auto-set)    |
+| `RAZORPAY_KEY_ID`     | Razorpay API key                   |
+| `RAZORPAY_KEY_SECRET` | Razorpay secret                    |
+| `MAIL_USERNAME`       | Gmail address for sending emails   |
+| `MAIL_PASSWORD`       | Gmail app password (16 chars)      |
+| `ALLOWED_EMAIL_DOMAIN`| Restrict signups to a domain       |
+
+---
+
+## Agile Development
+
+This project was built using Agile methodology with sprint-based delivery.
+
+**Sprint 1** — User auth, menu display, cart, basic order placement  
+**Sprint 2** — Payment integration, digital tokens, FCFS queue, public order display
+
+**Definition of Done:** Code implemented → stored in DB → UI working → no critical bugs → tested → integrated
+
+---
+
+## Contributing
+
+1. Fork the repo
+2. Create a feature branch: `git checkout -b feature/your-feature`
+3. Commit your changes: `git commit -m 'Add your feature'`
+4. Push and open a Pull Request
+
+---
+
+## License
+
+MIT
