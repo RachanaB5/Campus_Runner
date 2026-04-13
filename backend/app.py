@@ -18,7 +18,7 @@ print(f"📂 Parent directory: {parent_dir}")
 print(f"📂 Looking for .env at: {dotenv_path}")
 print(f"📂 .env exists: {os.path.exists(dotenv_path)}")
 
-load_dotenv(dotenv_path)
+load_dotenv(dotenv_path, override=True)
 # Optional backend/.env: fills in vars missing from project root (e.g. MAIL_* only in backend/)
 backend_dotenv = os.path.join(backend_dir, '.env')
 if os.path.exists(backend_dotenv):

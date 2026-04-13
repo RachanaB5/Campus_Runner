@@ -1,12 +1,40 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, Checkout, Order, OrderItem, User, Food, Delivery
+from models import db, Checkout, Order, OrderItem, User, Food, Delivery, RewardPoints, RewardTransaction
 from datetime import datetime, timedelta
 from utils import send_order_confirmation_email
 import uuid
 import re
 
 checkout_bp = Blueprint('checkout', __name__)
+
+
+def _parse_redeemed_voucher(transaction: RewardTransaction | None):
+    if not transaction or not transaction.description or not transaction.description.startswith('VOUCHER|'):
+        return None
+    parts = transaction.description.split('|')
+    if len(parts) < 8:
+        return None
+    _, voucher_id, name, discount_type, discount_value, code, status, redeemed_at = parts[:8]
+    return {
+        'voucher_id': voucher_id,
+        'name': name,
+        'discount_type': discount_type,
+        'discount_value': float(discount_value),
+        'code': code,
+        'status': status,
+        'is_used': status == 'used',
+        'redeemed_at': redeemed_at,
+        'transaction': transaction,
+    }
+
+
+def _compute_voucher_discount(voucher, subtotal: float, delivery_fee: float) -> float:
+    if not voucher:
+        return 0.0
+    if voucher['discount_type'] == 'delivery':
+        return min(delivery_fee, float(voucher['discount_value']))
+    return min(subtotal + delivery_fee, float(voucher['discount_value']))
 
 def generate_order_number():
     """Generate unique order number"""
@@ -160,7 +188,7 @@ def confirm_checkout():
             }), 400
         
         # All validations passed - create order
-        total_amount = 0
+        subtotal = 0
         order_items = []
         
         for item in items:
@@ -172,7 +200,7 @@ def confirm_checkout():
             quantity = int(item['quantity'])
             unit_price = float(item.get('price', food.price))
             total_price = unit_price * quantity
-            total_amount += total_price
+            subtotal += total_price
             
             order_item = OrderItem(
                 id=str(uuid.uuid4()),
@@ -184,6 +212,32 @@ def confirm_checkout():
             )
             order_items.append(order_item)
         
+        tax_amount = round(float(data.get('tax_amount', round(subtotal * 0.05, 2))), 2)
+        delivery_fee = round(float(data.get('delivery_fee', 0)), 2)
+        discount_amount = 0.0
+        discount_code = None
+        reward_code = str(data.get('reward_code') or '').strip()
+
+        if reward_code:
+            reward = RewardPoints.query.filter_by(user_id=user_id).first()
+            if reward:
+                transactions = RewardTransaction.query.filter_by(
+                    reward_points_id=reward.id,
+                    transaction_type='redeemed',
+                ).order_by(RewardTransaction.created_at.desc()).all()
+                matched_voucher = None
+                for transaction in transactions:
+                    voucher = _parse_redeemed_voucher(transaction)
+                    if voucher and voucher['code'] == reward_code and not voucher['is_used']:
+                        matched_voucher = voucher
+                        break
+                if not matched_voucher:
+                    return jsonify({'error': 'Coupon is invalid or already used'}), 400
+                discount_amount = round(_compute_voucher_discount(matched_voucher, subtotal, delivery_fee), 2)
+                discount_code = matched_voucher['code']
+
+        final_total = round(max(0.0, subtotal + tax_amount + delivery_fee - discount_amount), 2)
+
         # Create order
         normalized_payment_method = (checkout.payment_method or '').strip().lower()
         if normalized_payment_method == 'cash':
@@ -193,8 +247,8 @@ def confirm_checkout():
             id=str(uuid.uuid4()),
             customer_id=user_id,
             order_number=generate_order_number(),
-            total_amount=checkout.final_total,
-            delivery_fee=checkout.delivery_fee,
+            total_amount=final_total,
+            delivery_fee=delivery_fee,
             delivery_address=checkout.delivery_address,
             customer_phone=checkout.customer_phone,
             special_instructions=checkout.special_instructions,
@@ -220,6 +274,12 @@ def confirm_checkout():
         checkout.order_id = order.id
         checkout.checkout_status = 'confirmed'
         checkout.estimated_delivery_time = order.estimated_delivery_time
+        checkout.discount_code = discount_code
+        checkout.discount_amount = discount_amount
+        checkout.subtotal = subtotal
+        checkout.tax_amount = tax_amount
+        checkout.delivery_fee = delivery_fee
+        checkout.final_total = final_total
         
         db.session.add(order)
         db.session.add(delivery)
@@ -231,6 +291,19 @@ def confirm_checkout():
         delivery_otp = OrderOTP.create_for_order(order.id, delivery.id, otp_type='delivery')
         db.session.add(pickup_otp)
         db.session.add(delivery_otp)
+
+        if discount_code:
+            reward = RewardPoints.query.filter_by(user_id=user_id).first()
+            if reward:
+                transactions = RewardTransaction.query.filter_by(
+                    reward_points_id=reward.id,
+                    transaction_type='redeemed',
+                ).order_by(RewardTransaction.created_at.desc()).all()
+                for transaction in transactions:
+                    voucher = _parse_redeemed_voucher(transaction)
+                    if voucher and voucher['code'] == discount_code and not voucher['is_used']:
+                        transaction.description = transaction.description.replace('|unused|', '|used|', 1)
+                        break
         db.session.commit()
         
         # Send confirmation emails (non-blocking)
@@ -275,6 +348,8 @@ def confirm_checkout():
             'order_number': order.order_number,
             'pickup_otp': pickup_otp.otp,
             'delivery_otp': delivery_otp.otp,
+            'discount_amount': discount_amount,
+            'discount_code': discount_code,
             'estimated_delivery': order.estimated_delivery_time.isoformat() if order.estimated_delivery_time else None
         }), 201
     

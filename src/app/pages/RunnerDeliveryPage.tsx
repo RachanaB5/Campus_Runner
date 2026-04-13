@@ -75,6 +75,7 @@ export function RunnerDeliveryPage() {
       await api.updateRunnerDeliveryStatus(details.delivery_id || deliveryId, "on_the_way");
       const response = await api.updateRunnerDeliveryStatus(details.delivery_id || deliveryId, "delivered", deliveryOtp);
       setPointsEarned(response.points_earned || 0);
+      window.dispatchEvent(new Event("rewards:refresh"));
       setDetails((previous: any) => ({
         ...(previous || {}),
         delivery_status: "delivered",

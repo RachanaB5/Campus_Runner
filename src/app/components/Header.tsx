@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router";
-import { ShoppingCart, User, Award, Bike, Home, Clock, LogIn, Settings } from "lucide-react";
+import { ShoppingCart, User, Award, Bike, Home, Clock, LogIn, Settings, LayoutDashboard } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import { useEffect, useState } from "react";
@@ -12,6 +12,7 @@ export function Header() {
   const { isLoggedIn, user } = useAuth();
   const { getTotalItems } = useCart();
   const [isRunnerMode, setIsRunnerMode] = useState(false);
+  const [hasRunnerProfile, setHasRunnerProfile] = useState(false);
   const [isTogglingRunner, setIsTogglingRunner] = useState(false);
   const [activeDelivery, setActiveDelivery] = useState<any | null>(null);
   const [showDeliveryPanel, setShowDeliveryPanel] = useState(false);
@@ -19,6 +20,7 @@ export function Header() {
   useEffect(() => {
     if (!isLoggedIn) {
       setIsRunnerMode(false);
+      setHasRunnerProfile(false);
       return;
     }
 
@@ -26,11 +28,13 @@ export function Header() {
     api.getRunnerProfile()
       .then((runner) => {
         if (isMounted) {
+          setHasRunnerProfile(Boolean(runner?.id));
           setIsRunnerMode(Boolean(runner?.is_available));
         }
       })
       .catch(() => {
         if (isMounted) {
+          setHasRunnerProfile(false);
           setIsRunnerMode(false);
         }
       });
@@ -39,6 +43,21 @@ export function Header() {
       isMounted = false;
     };
   }, [isLoggedIn]);
+
+  useEffect(() => {
+    const handleRunnerStatusChanged = (event: Event) => {
+      const detail = (event as CustomEvent<{ isOnline?: boolean; hasRunnerProfile?: boolean }>).detail || {};
+      if (typeof detail.hasRunnerProfile === "boolean") {
+        setHasRunnerProfile(detail.hasRunnerProfile);
+      }
+      if (typeof detail.isOnline === "boolean") {
+        setIsRunnerMode(detail.isOnline);
+      }
+    };
+
+    window.addEventListener("runner:status-changed", handleRunnerStatusChanged as EventListener);
+    return () => window.removeEventListener("runner:status-changed", handleRunnerStatusChanged as EventListener);
+  }, []);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -107,11 +126,18 @@ export function Header() {
           vehicle_type: "bike",
           license_number: `DL-${Date.now()}`,
         });
+        setHasRunnerProfile(true);
+        window.dispatchEvent(new CustomEvent("runner:status-changed", {
+          detail: { hasRunnerProfile: true, isOnline: false },
+        }));
       }
 
       const response = await api.toggleRunnerAvailability();
       const nextAvailability = Boolean(response?.runner?.is_available);
       setIsRunnerMode(nextAvailability);
+      window.dispatchEvent(new CustomEvent("runner:status-changed", {
+        detail: { hasRunnerProfile: true, isOnline: nextAvailability },
+      }));
       alert(
         nextAvailability
           ? "You are now available for deliveries"
@@ -167,6 +193,17 @@ export function Header() {
                     <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                   )}
                 </button>
+                {hasRunnerProfile && (
+                  <Link
+                    to="/runner"
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                      isActive('/runner') ? 'bg-orange-50 text-orange-600' : 'text-gray-600 hover:text-orange-600'
+                    }`}
+                  >
+                    <LayoutDashboard className="w-5 h-5" />
+                    <span>Runner Dashboard</span>
+                  </Link>
+                )}
                 <Link 
                   to="/rewards" 
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
@@ -271,6 +308,17 @@ export function Header() {
                   <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
                 )}
               </button>
+              {hasRunnerProfile && (
+                <Link 
+                  to="/runner" 
+                  className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg ${
+                    isActive('/runner') ? 'text-orange-600' : 'text-gray-600'
+                  }`}
+                >
+                  <LayoutDashboard className="w-5 h-5" />
+                  <span className="text-xs">Dashboard</span>
+                </Link>
+              )}
               <Link 
                 to="/rewards" 
                 className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg ${

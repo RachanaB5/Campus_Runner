@@ -190,15 +190,19 @@ export const rewardsAPI = {
     return apiRequest('/rewards/transactions');
   },
 
-  redeemPoints: async (points: number) => {
+  redeemPoints: async (points: number, voucherId?: string) => {
     return apiRequest('/rewards/redeem', {
       method: 'POST',
-      body: JSON.stringify({ points }),
+      body: JSON.stringify({ points, voucher_id: voucherId }),
     });
   },
 
   getAvailableRewards: async () => {
     return apiRequest('/rewards/available');
+  },
+
+  getRedeemedVouchers: async () => {
+    return apiRequest('/rewards/redeemed-vouchers');
   },
 
   claimDailyBonus: async () => {
@@ -372,6 +376,9 @@ export const runnerAPI = {
 
 export const getAvailableDeliveries = runnerAPI.getAvailableDeliveries;
 export const acceptDelivery = runnerAPI.acceptDelivery;
+export const getAvailableOrders = runnerAPI.getAvailableOrders;
+export const acceptOrder = runnerAPI.acceptOrder;
+export const getRunnerProfile = runnerAPI.getRunnerProfile;
 
 // Admin API
 export const adminAPI = {
@@ -599,6 +606,7 @@ export const api = {
   getRewardTransactions: rewardsAPI.getRewardTransactions,
   redeemPoints: rewardsAPI.redeemPoints,
   getAvailableRewards: rewardsAPI.getAvailableRewards,
+  getRedeemedVouchers: rewardsAPI.getRedeemedVouchers,
   claimDailyBonus: rewardsAPI.claimDailyBonus,
   
   // Runner methods

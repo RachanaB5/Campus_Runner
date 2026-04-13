@@ -10,6 +10,10 @@ from services.notification_service import notify_order_taken
 runner_bp = Blueprint('runner', __name__)
 
 
+def _calculate_runner_reward_points(total_amount) -> int:
+    return max(10, int(round(float(total_amount or 0) * 0.1)))
+
+
 def _format_customer_name(name: str | None) -> str:
     if not name:
         return 'Campus User'
@@ -340,8 +344,27 @@ def get_available_orders():
         
         if not runner:
             return jsonify({'error': 'Runner profile not found'}), 404
+        if not runner.is_available:
+            return jsonify({
+                'orders': [],
+                'available_orders': [],
+                'count': 0,
+                'message': 'Enable Runner Mode to receive available orders',
+            }), 200
         
-        candidate_orders = Order.query.filter(Order.status.in_(['confirmed', 'preparing', 'ready'])).order_by(Order.created_at.asc()).all()
+        candidate_orders = Order.query.filter(
+            Order.status.in_(['placed', 'confirmed', 'preparing', 'ready'])
+        ).order_by(Order.created_at.asc()).all()
+        self_excluded_orders = 0
+
+        visible_orders = [
+            order for order in candidate_orders
+            if order.customer_id != user_id
+        ]
+        self_excluded_orders = len(candidate_orders) - len(visible_orders)
+
+        candidate_orders = visible_orders
+        candidate_orders = [order for order in candidate_orders if order.status in ['placed', 'confirmed', 'preparing', 'ready']]
 
         orders_data = []
         for order in candidate_orders:
@@ -368,7 +391,7 @@ def get_available_orders():
                     })
                 first_food = order.items[0].food if order.items else None
                 counter_number = getattr(first_food, 'counter_number', None) if first_food else None
-                reward_points = max(10, int(round(float(order.total_amount or 0) * 0.1)))
+                reward_points = _calculate_runner_reward_points(order.total_amount)
                 orders_data.append({
                     'id': order.id,
                     'order_id': order.id,
@@ -396,7 +419,15 @@ def get_available_orders():
         return jsonify({
             'orders': orders_data,
             'available_orders': orders_data,
-            'count': len(orders_data)
+            'count': len(orders_data),
+            'self_excluded_orders': self_excluded_orders,
+            'message': (
+                'No other users have open orders right now.'
+                if len(orders_data) == 0 and self_excluded_orders == 0
+                else 'Your own open orders are hidden here. Switch to a different customer account to test runner acceptance.'
+                if len(orders_data) == 0 and self_excluded_orders > 0
+                else None
+            ),
         }), 200
     
     except Exception as e:
@@ -413,6 +444,8 @@ def accept_order(order_id):
 
         if not runner:
             return jsonify({'error': 'Runner profile not found'}), 404
+        if not runner.is_available:
+            return jsonify({'error': 'Enable Runner Mode before accepting orders'}), 400
 
         delivery = Delivery.query.filter_by(order_id=order_id).first()
         if not delivery:
@@ -420,12 +453,14 @@ def accept_order(order_id):
 
         locked_order = db.session.execute(
             select(Order)
-            .where(Order.id == order_id, Order.status.in_(['confirmed', 'ready']))
+            .where(Order.id == order_id, Order.status.in_(['placed', 'confirmed', 'preparing', 'ready']))
             .with_for_update(skip_locked=True)
         ).scalar_one_or_none()
 
         if not locked_order:
             return jsonify({'error': 'Order already accepted by another runner'}), 409
+        if locked_order.customer_id == user_id:
+            return jsonify({'error': 'You cannot accept delivery for your own order'}), 403
 
         current_delivery = Delivery.query.filter_by(order_id=order_id).first()
         if current_delivery and current_delivery.runner_id:
@@ -507,7 +542,7 @@ def get_runner_order_details(order_id):
                 'image_url': item.food.image_url if item.food else None,
                 'customizations': item.customizations,
             } for item in (order.items or [])],
-            'runner_reward_points': max(10, int(round(float(order.total_amount or 0) / 15))),
+            'runner_reward_points': _calculate_runner_reward_points(order.total_amount),
             'customer_name': _format_customer_name(customer.name if customer else None),
             'customer_initial': (customer.name[:1].upper() if customer and customer.name else 'C'),
             'customer_phone': customer.phone if customer and delivery.status in ['picked_up', 'on_the_way', 'delivered'] else None,
@@ -652,7 +687,7 @@ def update_delivery_status_v2(delivery_id):
             order.delivered_at = datetime.utcnow()
             runner.total_deliveries = (runner.total_deliveries or 0) + 1
             runner.status = 'online'
-            reward_points = max(10, int(round(float(order.total_amount or 0) / 15)))
+            reward_points = _calculate_runner_reward_points(order.total_amount)
             _reward_runner(user_id, order, reward_points)
             _emit_order_status(order, 'delivered', runner_name)
         else:
@@ -663,7 +698,7 @@ def update_delivery_status_v2(delivery_id):
             'message': 'Delivery status updated',
             'delivery': delivery.to_dict(),
             'order': order.to_dict(),
-            'points_earned': max(10, int(round(float(order.total_amount or 0) / 15))) if new_status == 'delivered' else 0,
+            'points_earned': _calculate_runner_reward_points(order.total_amount) if new_status == 'delivered' else 0,
         }), 200
     except Exception as e:
         db.session.rollback()

@@ -86,6 +86,8 @@ export function Home() {
   } = useCart();
   const { isLoggedIn } = useAuth();
   const navigate = useNavigate();
+  const [canRunDeliveries, setCanRunDeliveries] = useState(false);
+  const [isRunnerOnline, setIsRunnerOnline] = useState(false);
 
   // Close drawer on outside click
   useEffect(() => {
@@ -107,6 +109,57 @@ export function Home() {
   useEffect(() => {
     fetchMenuItems();
   }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setCanRunDeliveries(false);
+      setIsRunnerOnline(false);
+      return;
+    }
+
+    api.getRunnerProfile()
+      .then((runner) => {
+        setCanRunDeliveries(Boolean(runner?.id));
+        setIsRunnerOnline(Boolean(runner?.is_available));
+      })
+      .catch(() => {
+        setCanRunDeliveries(false);
+        setIsRunnerOnline(false);
+      });
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    const syncRunnerState = (event: Event) => {
+      const detail = (event as CustomEvent<{ isOnline?: boolean; hasRunnerProfile?: boolean }>).detail || {};
+      if (typeof detail.hasRunnerProfile === "boolean") {
+        setCanRunDeliveries(detail.hasRunnerProfile);
+      }
+      if (typeof detail.isOnline === "boolean") {
+        setIsRunnerOnline(detail.isOnline);
+      }
+    };
+
+    const refreshRunnerProfile = async () => {
+      if (!isLoggedIn) return;
+      try {
+        const runner = await api.getRunnerProfile();
+        setCanRunDeliveries(Boolean(runner?.id));
+        setIsRunnerOnline(Boolean(runner?.is_available));
+      } catch {
+        setCanRunDeliveries(false);
+        setIsRunnerOnline(false);
+      }
+    };
+
+    window.addEventListener("runner:status-changed", syncRunnerState as EventListener);
+    window.addEventListener("focus", refreshRunnerProfile);
+    document.addEventListener("visibilitychange", refreshRunnerProfile);
+    return () => {
+      window.removeEventListener("runner:status-changed", syncRunnerState as EventListener);
+      window.removeEventListener("focus", refreshRunnerProfile);
+      document.removeEventListener("visibilitychange", refreshRunnerProfile);
+    };
+  }, [isLoggedIn]);
 
   const fetchMenuItems = async () => {
     try {
@@ -165,12 +218,22 @@ export function Home() {
       navigate("/login");
       return;
     }
+    if (!canRunDeliveries) {
+      alert("Register as a runner first to accept deliveries.");
+      navigate("/runner");
+      return;
+    }
+    if (!isRunnerOnline) {
+      alert("Please switch on Runner Mode before viewing available deliveries.");
+      navigate("/runner");
+      return;
+    }
     
     setShowDeliveries(true);
     setIsLoadingDeliveries(true);
     try {
-      const response = await api.getAvailableDeliveries();
-      setAvailableDeliveries(response?.deliveries || []);
+      const response = await api.getAvailableOrders();
+      setAvailableDeliveries(response?.available_orders || response?.orders || []);
     } catch (error) {
       console.error("Error fetching deliveries:", error);
       setAvailableDeliveries([]);
@@ -179,11 +242,19 @@ export function Home() {
     }
   };
 
-  const handleAcceptDelivery = async (deliveryId: string) => {
+  const handleAcceptDelivery = async (orderId: string) => {
     try {
-      await api.acceptDelivery(deliveryId);
-      setAvailableDeliveries(availableDeliveries.filter(d => d.id !== deliveryId));
-      alert("Delivery accepted! Head to the restaurant.");
+      const response = await api.acceptOrder(orderId);
+      setAvailableDeliveries(availableDeliveries.filter((delivery) => (delivery.id || delivery.order_id) !== orderId));
+      setShowDeliveries(false);
+      navigate(`/runner/delivery/${response.delivery_id}`, {
+        state: {
+          order: response.order,
+          order_id: orderId,
+          delivery_id: response.delivery_id,
+          pickup_otp: response.pickup_otp,
+        },
+      });
     } catch (error) {
       console.error("Error accepting delivery:", error);
       alert("Failed to accept delivery. Please try again.");
@@ -241,7 +312,8 @@ export function Home() {
         </div>
         <button
           onClick={handleRunnerClick}
-          className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-xl shadow-sm transition-colors font-medium"
+          disabled={!isLoggedIn || !canRunDeliveries || !isRunnerOnline}
+          className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white px-5 py-3 rounded-xl shadow-sm transition-colors font-medium"
           title="View available deliveries"
         >
           <Bike className="w-5 h-5" />
@@ -502,16 +574,33 @@ export function Home() {
               ) : (
                 <div className="space-y-4">
                   {availableDeliveries.map((delivery) => (
-                    <div key={delivery.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div key={delivery.id || delivery.order_id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                       <div className="flex items-start justify-between mb-3">
                         <div>
-                          <h3 className="font-semibold text-gray-900">Order #{delivery.order_id}</h3>
-                          <p className="text-sm text-gray-600 mt-1">₹{delivery.total_amount?.toFixed(2) || "N/A"}</p>
+                          <h3 className="font-semibold text-gray-900">
+                            Order #{delivery.token_number || delivery.order_number || delivery.order_id}
+                          </h3>
+                          <p className="text-sm text-gray-600 mt-1">
+                            ₹{Number(delivery.total_amount || 0).toFixed(2)}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {(delivery.item_count || 0)} item{delivery.item_count === 1 ? "" : "s"}
+                            {delivery.customer_name ? ` • ${delivery.customer_name}` : ""}
+                          </p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm text-green-600 font-semibold">+{Math.floor((delivery.total_amount || 0) / 10)} pts</p>
+                          <p className="text-sm text-green-600 font-semibold">
+                            +{delivery.reward_points || Math.max(10, Math.round(Number(delivery.total_amount || 0) * 0.1))} pts
+                          </p>
                         </div>
                       </div>
+
+                      {(delivery.items_preview || delivery.items_summary)?.length > 0 && (
+                        <p className="text-sm text-gray-500 mb-2">
+                          {(delivery.items_preview || delivery.items_summary).join(", ")}
+                          {delivery.item_count > 2 ? ` +${delivery.item_count - 2} more` : ""}
+                        </p>
+                      )}
 
                       {delivery.delivery_address && (
                         <div className="flex items-center gap-2 text-gray-600 mb-2">
@@ -527,7 +616,7 @@ export function Home() {
                       )}
 
                       <button
-                        onClick={() => handleAcceptDelivery(delivery.id)}
+                        onClick={() => handleAcceptDelivery(delivery.id || delivery.order_id)}
                         className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
                       >
                         <Bike className="w-4 h-4" />
