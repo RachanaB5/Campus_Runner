@@ -16,8 +16,8 @@ def generate_order_number():
 
 def get_available_runner():
     """Find an available runner for delivery"""
-    # Get a runner who is registered and available
-    runner = User.query.filter_by(role='runner').first()
+    from models import Runner
+    runner = Runner.query.filter_by(is_available=True, status='online').first()
     return runner
 
 
@@ -72,7 +72,7 @@ def create_order():
                 return jsonify({'error': f'Food {item["food_id"]} not found'}), 404
             
             quantity = int(item['quantity'])
-            unit_price = float(item.get('price', food.price))
+            unit_price = float(food.price)  # always use server-side price, never trust client
             total_price = unit_price * quantity
             total_amount += total_price
             
@@ -128,19 +128,7 @@ def create_order():
         db.session.commit()
         
         # Send runner OTP notification if runner was assigned
-        if runner and order.pickup_otp and order.delivery_otp:
-            from app import app as flask_app
-            runner_user = User.query.get(runner.user_id) or runner
-            send_runner_otp_notification(
-                runner_email=runner_user.email,
-                runner_name=runner_user.name,
-                order_number=order.order_number,
-                pickup_otp=order.pickup_otp.otp,
-                delivery_otp=order.delivery_otp.otp,
-                pickup_location='Main Canteen',  # Update based on your canteen info
-                delivery_address=order.delivery_address,
-                app=flask_app
-            )
+        # Runner OTP notification is handled by checkout flow; skip here
         
         return jsonify({
             'message': 'Order created successfully',
@@ -185,7 +173,8 @@ def get_order_detail(order_id):
             return jsonify({'error': 'Order not found'}), 404
         
         # Only allow user to view their own orders
-        if order.customer_id != user_id and User.query.get(user_id).role not in ['admin', 'staff']:
+        requesting_user = User.query.get(user_id)
+        if order.customer_id != user_id and (not requesting_user or requesting_user.role not in ['admin', 'staff']):
             return jsonify({'error': 'Unauthorized'}), 403
         
         order_dict = order.to_dict()

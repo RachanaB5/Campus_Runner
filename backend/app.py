@@ -68,20 +68,22 @@ if 'MAIL_SUPPRESS_SEND' in os.environ:
 from models import db
 db.init_app(app)
 
+_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "http://127.0.0.1:3000",
+    "http://10.17.20.172:5173",
+    "http://10.17.20.172:5174",
+    "http://10.17.20.172:3000",
+]
+
 # Improved CORS configuration
 CORS(app, resources={
     r"/api/*": {
-        "origins": [
-            "http://localhost:5173", 
-            "http://localhost:5174",
-            "http://localhost:3000",
-            "http://127.0.0.1:5173",
-            "http://127.0.0.1:5174",
-            "http://127.0.0.1:3000",
-            "http://10.17.20.172:5173",
-            "http://10.17.20.172:5174",
-            "http://10.17.20.172:3000"
-        ],
+        "origins": _ALLOWED_ORIGINS,
         "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
         "supports_credentials": True
@@ -92,7 +94,7 @@ jwt = JWTManager(app)
 
 try:
     from flask_socketio import SocketIO, join_room
-    socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+    socketio = SocketIO(app, cors_allowed_origins=_ALLOWED_ORIGINS, async_mode='threading')
     from socketio_events import register_socketio_events
 
     @socketio.on('join_user_room')

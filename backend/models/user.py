@@ -36,6 +36,8 @@ class User(db.Model):
     
     def check_password(self, password):
         """Verify password"""
+        if not self.password_hash:
+            return False
         return bcrypt.checkpw(password.encode('utf-8'), self.password_hash.encode('utf-8'))
     
     def to_dict(self):

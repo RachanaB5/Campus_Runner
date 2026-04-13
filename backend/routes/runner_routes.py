@@ -449,8 +449,7 @@ def get_available_orders():
             if order.customer_id != user_id
         ]
         self_excluded_orders = len(candidate_orders) - len(visible_orders)
-
-        candidate_orders = [order for order in visible_orders if order.status in RUNNER_VISIBLE_ORDER_STATUSES]
+        candidate_orders = visible_orders
 
         orders_data = []
         for order in candidate_orders:
@@ -739,7 +738,8 @@ def update_delivery_status_v2(delivery_id):
         data = request.get_json() or {}
         new_status = data.get('status')
         otp_code = str(data.get('otp') or '').strip()
-        runner_name = User.query.get(user_id).name if User.query.get(user_id) else None
+        runner_user = User.query.get(user_id)
+        runner_name = runner_user.name if runner_user else None
 
         if new_status == 'picked_up':
             pickup_otp = OrderOTP.query.filter_by(order_id=order.id, delivery_id=delivery.id, otp_type='pickup').order_by(OrderOTP.created_at.desc()).first()

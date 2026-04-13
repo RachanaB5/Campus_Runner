@@ -46,7 +46,7 @@ def app(tmp_path_factory):
     import routes.checkout_routes as checkout_routes
     import utils
 
-    auth_routes.queue_otp_email = lambda *args, **kwargs: None
+    auth_routes.dispatch_otp_email = lambda *args, **kwargs: (False, None)
     checkout_routes.send_order_confirmation_email = lambda *args, **kwargs: True
     utils.send_admin_order_notification = lambda *args, **kwargs: True
     utils.send_email_in_background = lambda *args, **kwargs: None
