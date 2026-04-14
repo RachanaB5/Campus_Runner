@@ -87,3 +87,30 @@ def test_runner_delivery_status_requires_correct_otp_and_awards_points(client, m
     reward = RewardPoints.query.filter_by(user_id=runner_user.id).first()
     assert reward is not None
     assert reward.points_balance > 0
+
+
+def test_runner_cannot_accept_new_order_while_active_delivery_exists(client, make_user, make_runner, make_food, make_order, auth_headers):
+    customer = make_user(email="customer-active@rvu.edu.in")
+    runner_user, _runner = make_runner(email="runner-active@rvu.edu.in")
+    food = make_food(name="Combo Meal", price=140)
+
+    # Existing active assignment for this runner
+    make_order(
+        customer=customer,
+        items=[(food, 1, None)],
+        status="confirmed",
+        delivery_status="assigned",
+        runner_user_id=runner_user.id,
+    )
+
+    new_order, _delivery = make_order(
+        customer=customer,
+        items=[(food, 1, None)],
+        status="confirmed",
+        delivery_status="pending",
+        create_otps=True,
+    )
+
+    response = client.post(f"/api/runner/accept/{new_order.id}", headers=auth_headers(runner_user))
+    assert response.status_code == 409
+    assert "active delivery" in response.get_json()["error"].lower()

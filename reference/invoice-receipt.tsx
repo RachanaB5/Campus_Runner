@@ -135,7 +135,7 @@ export function InvoiceReceiptEmail({
   items = [
     { description: 'Sample Product', quantity: 1, unitPrice: 99.99, total: 99.99 },
   ],
-  paymentMethod = { type: 'card', last4: '4242', brand: 'Visa' },
+  paymentMethod = { type: 'card', last4: '0000', brand: 'Card' },
   billingAddress = {
     name: 'John Doe',
     street: '123 Main St',

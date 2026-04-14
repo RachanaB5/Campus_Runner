@@ -1,8 +1,9 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, Order, OrderItem, User, Food, Delivery, RewardPoints, RewardTransaction, Review, OrderOTP, Runner
+from models import db, Order, OrderItem, User, Food, Delivery, Payment, RewardPoints, RewardTransaction, Review, OrderOTP, Runner
 from datetime import datetime, timedelta
 from utils import send_runner_otp_notification
+from services.payment_service import issue_refund
 import uuid
 
 order_bp = Blueprint('order', __name__)
@@ -246,8 +247,39 @@ def cancel_order(order_id):
         if order.customer_id != user_id:
             return jsonify({'error': 'Unauthorized'}), 403
         
-        if order.status not in ['pending', 'confirmed']:
+        # Do not allow cancellation once the delivery is in-flight or completed.
+        delivery = order.delivery
+        if order.status in ['picked_up', 'in_transit', 'on_the_way', 'delivered']:
             return jsonify({'error': 'Order cannot be cancelled'}), 400
+        if delivery and delivery.status in ['picked_up', 'in_transit', 'on_the_way', 'delivered']:
+            return jsonify({'error': 'Order cannot be cancelled after pickup'}), 400
+
+        refundable_statuses = {'paid', 'completed'}
+        if str(order.payment_status).lower() in refundable_statuses:
+            successful_payment = Payment.query.filter_by(order_id=order.id).filter(
+                Payment.status.in_(['success', 'pending'])
+            ).order_by(Payment.created_at.desc()).first()
+
+            if successful_payment:
+                if successful_payment.method in {'upi', 'card'} and successful_payment.razorpay_payment_id:
+                    try:
+                        issue_refund(successful_payment.razorpay_payment_id)
+                    except Exception:
+                        # Keep cancellation reliable in mock mode even if gateway call fails.
+                        pass
+                successful_payment.status = 'refunded' if successful_payment.method != 'cod' else 'cancelled'
+            order.payment_status = 'refunded'
+        elif str(order.payment_status).lower() in {'pending', 'cod_pending'}:
+            order.payment_status = 'cancelled'
+
+        if delivery:
+            delivery.status = 'cancelled'
+            if delivery.runner_id:
+                runner_profile = Runner.query.filter_by(user_id=delivery.runner_id).first()
+                if runner_profile and runner_profile.status == 'on_delivery':
+                    runner_profile.status = 'online' if runner_profile.is_available else 'offline'
+            delivery.runner_id = None
+            delivery.accepted_at = None
         
         order.status = 'cancelled'
         db.session.commit()

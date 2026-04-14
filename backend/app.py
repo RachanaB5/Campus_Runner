@@ -714,7 +714,9 @@ def test_email():
         }), 500
 
 if __name__ == '__main__':
+    host = os.getenv('APP_HOST', '0.0.0.0')
+    port = int(os.getenv('APP_PORT', '5000'))
     if socketio:
-        socketio.run(app, debug=True, port=5000)
+        socketio.run(app, debug=True, host=host, port=port)
     else:
-        app.run(debug=True, port=5000)
+        app.run(debug=True, host=host, port=port)

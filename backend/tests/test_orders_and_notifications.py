@@ -40,6 +40,52 @@ def test_other_user_cannot_cancel_order(client, make_user, make_food, make_order
     assert response.status_code in (403, 404)
 
 
+def test_cancel_paid_order_marks_refund_and_releases_runner(client, make_user, make_food, make_order, make_runner, auth_headers):
+    import uuid
+    from models import Order, Payment, Delivery, Runner, db
+
+    customer = make_user(email="paid-cancel@rvu.edu.in")
+    runner_user, _runner = make_runner(email="runner-cancel@rvu.edu.in", status="on_delivery")
+    food = make_food(name="Refund Bowl", price=120)
+    order, delivery = make_order(
+        customer=customer,
+        items=[(food, 1, None)],
+        status="confirmed",
+        payment_status="paid",
+        delivery_status="assigned",
+        runner_user_id=runner_user.id,
+    )
+
+    payment = Payment(
+        id=str(uuid.uuid4()),
+        order_id=order.id,
+        user_id=customer.id,
+        method="card",
+        razorpay_order_id=f"order_test_{uuid.uuid4().hex[:8]}",
+        razorpay_payment_id=f"pay_test_{uuid.uuid4().hex[:8]}",
+        amount=int(round(float(order.total_amount) * 100)),
+        currency="INR",
+        status="success",
+    )
+    db.session.add(payment)
+    db.session.commit()
+
+    response = client.post(f"/api/order/{order.id}/cancel", headers=auth_headers(customer))
+    assert response.status_code == 200
+
+    updated_order = Order.query.get(order.id)
+    updated_payment = Payment.query.get(payment.id)
+    updated_delivery = Delivery.query.get(delivery.id)
+    runner_profile = Runner.query.filter_by(user_id=runner_user.id).first()
+
+    assert updated_order.status == "cancelled"
+    assert updated_order.payment_status == "refunded"
+    assert updated_payment.status == "refunded"
+    assert updated_delivery.status == "cancelled"
+    assert updated_delivery.runner_id is None
+    assert runner_profile.status == "online"
+
+
 def test_order_detail_returns_items_and_status(client, make_user, make_food, make_order, auth_headers):
     customer = make_user(email="customer@rvu.edu.in")
     food = make_food(name="Chicken Roll", price=100)

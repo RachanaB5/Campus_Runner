@@ -15,6 +15,8 @@ A real-time campus canteen ordering and delivery platform. Students can browse t
 - **OTP Verification** — Delivery confirmation via OTP
 - **Admin Dashboard** — Manage menu, orders, users, and view analytics
 - **Email Notifications** — Order confirmations and OTP emails via Gmail/SMTP
+- **Order Cancellation + Refund Handling** — Cancels pending/prep orders, releases assigned runners, and marks successful online payments as refunded
+- **FCFS Runner Claim Guard** — Runner order acceptance uses row-locking logic to reduce race conditions in first-come-first-served flow
 
 ---
 
@@ -94,6 +96,12 @@ pip install -r requirements.txt
 python app.py
 ```
 
+Shortcut command:
+
+```bash
+cd backend && pip install -r requirements.txt && python app.py
+```
+
 The API runs at `http://localhost:5000`. The database and a default admin account are created automatically on first run.
 
 > Default admin: `admin@rvu.edu.in` / `admin@123`
@@ -107,6 +115,17 @@ npm run dev
 ```
 
 The frontend runs at `http://localhost:5173`.
+
+### 5. Run with Docker Compose (optional)
+
+```bash
+docker compose up --build
+```
+
+Services:
+
+- Frontend: `http://localhost:5173`
+- Backend API: `http://localhost:5000`
 
 ---
 
@@ -122,6 +141,30 @@ pytest
 ```bash
 npm test
 ```
+
+Coverage commands:
+
+```bash
+# backend coverage
+cd backend
+pytest --cov=backend --cov-report=term-missing --cov-report=xml
+
+# frontend coverage
+cd ..
+npm run test:coverage
+```
+
+## CI Workflows
+
+- `.github/workflows/ci.yml`: backend tests (Py 3.11/3.12), frontend lint, typecheck, tests, and build (`npm run build`), with coverage/build artifacts uploaded.
+- `.github/workflows/test.yml`: focused backend/frontend test workflow with coverage artifacts.
+
+This repository already ignores `dist/` in `.gitignore`; CI builds frontend artifacts in workflow runs instead of relying on committed build output.
+
+## Notification Channels
+
+- Implemented: in-app notifications (DB + Socket.IO real-time events) and email.
+- Not yet implemented: browser/mobile push notification delivery (Web Push / FCM / APNs).
 
 ---
 

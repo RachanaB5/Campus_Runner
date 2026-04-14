@@ -210,16 +210,16 @@ export function PaymentMethodSelector({ amount, isLoading, disabled, savedMethod
               <Lock className="w-5 h-5 text-slate-100" />
             </div>
             <div className="mt-10 text-2xl font-semibold tracking-[0.2em]">
-              {formatCardNumber(cardNumber || "4242424242424242")}
+              {formatCardNumber(cardNumber || "") || "•••• •••• •••• ••••"}
             </div>
             <div className="mt-8 flex items-end justify-between">
               <div>
                 <p className="text-[10px] uppercase tracking-[0.3em] text-slate-200">Card Holder</p>
-                <p className="mt-1 font-semibold">{cardHolderName || "Cardholder Name"}</p>
+                <p className="mt-1 font-semibold">{cardHolderName || "Your Name"}</p>
               </div>
               <div>
                 <p className="text-[10px] uppercase tracking-[0.3em] text-slate-200">Expiry</p>
-                <p className="mt-1 font-semibold">{cardExpiry || "08/2027"}</p>
+                <p className="mt-1 font-semibold">{cardExpiry || "MM/YYYY"}</p>
               </div>
             </div>
           </div>
@@ -284,7 +284,7 @@ export function PaymentMethodSelector({ amount, isLoading, disabled, savedMethod
               type="text"
               value={cardNumber}
               onChange={(event) => setCardNumber(formatCardNumber(event.target.value))}
-              placeholder="4242 4242 4242 4242"
+              placeholder="Enter card number"
               className={`w-full rounded-xl border px-4 py-3 focus:outline-none ${
                 cardValid ? "border-gray-300 focus:border-orange-400" : "border-red-300 focus:border-red-400"
               }`}
@@ -313,7 +313,7 @@ export function PaymentMethodSelector({ amount, isLoading, disabled, savedMethod
               type="text"
               value={cardExpiry}
               onChange={(event) => setCardExpiry(event.target.value.replace(/[^\d/]/g, "").slice(0, 7))}
-              placeholder="08/2027"
+              placeholder="MM/YYYY"
               className="w-full rounded-xl border border-gray-300 px-4 py-3 focus:outline-none focus:border-orange-400"
             />
           </div>

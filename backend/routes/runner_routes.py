@@ -74,6 +74,13 @@ def _reward_runner(user_id: str, order, points: int):
     )
     db.session.add(transaction)
 
+
+def _runner_has_active_delivery(user_id: str) -> bool:
+    return Delivery.query.filter(
+        Delivery.runner_id == user_id,
+        Delivery.status.in_(['assigned', 'picked_up', 'on_the_way', 'in_transit'])
+    ).first() is not None
+
 @runner_bp.route('/register', methods=['POST'])
 @jwt_required()
 def register_as_runner():
@@ -298,17 +305,23 @@ def accept_delivery(delivery_id):
         
         if not runner:
             return jsonify({'error': 'Runner profile not found'}), 404
+        if not runner.is_available:
+            return jsonify({'error': 'Enable Runner Mode before accepting deliveries'}), 400
+        if _runner_has_active_delivery(user_id):
+            return jsonify({'error': 'Complete your active delivery before accepting a new one'}), 409
         
-        delivery = Delivery.query.get(delivery_id)
+        delivery = db.session.execute(
+            select(Delivery)
+            .where(Delivery.id == delivery_id, Delivery.status == 'pending', Delivery.runner_id.is_(None))
+            .with_for_update(skip_locked=True)
+        ).scalar_one_or_none()
         
         if not delivery:
-            return jsonify({'error': 'Delivery not found'}), 404
-        
-        if delivery.runner_id:
-            return jsonify({'error': 'Delivery already assigned'}), 400
+            return jsonify({'error': 'Delivery already assigned or unavailable'}), 409
         
         delivery.runner_id = user_id
         delivery.status = 'assigned'
+        delivery.accepted_at = datetime.utcnow()
         runner.status = 'on_delivery'
         
         # Update order status
@@ -531,6 +544,8 @@ def accept_order(order_id):
             return jsonify({'error': 'Runner profile not found'}), 404
         if not runner.is_available:
             return jsonify({'error': 'Enable Runner Mode before accepting orders'}), 400
+        if _runner_has_active_delivery(user_id):
+            return jsonify({'error': 'Complete your active delivery before accepting a new one'}), 409
 
         delivery = Delivery.query.filter_by(order_id=order_id).first()
         if not delivery:
