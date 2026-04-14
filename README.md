@@ -159,6 +159,8 @@ npm run test:coverage
 - `.github/workflows/ci.yml`: backend tests (Py 3.11/3.12), frontend lint, typecheck, tests, and build (`npm run build`), with coverage/build artifacts uploaded.
 - `.github/workflows/test.yml`: focused backend/frontend test workflow with coverage artifacts.
 
+See [DEVOPS.md](./DEVOPS.md) for the full Docker & DevOps reference.
+
 This repository already ignores `dist/` in `.gitignore`; CI builds frontend artifacts in workflow runs instead of relying on committed build output.
 
 ## Notification Channels

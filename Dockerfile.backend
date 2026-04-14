@@ -1,7 +1,7 @@
 # ============================================================================
 # Stage 1: Builder - Install dependencies
 # ============================================================================
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 WORKDIR /app/backend
 
@@ -10,9 +10,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install dependencies
+# Copy requirements and install dependencies into a shared prefix
 COPY backend/requirements.txt .
-RUN pip install --user --no-cache-dir -r requirements.txt
+RUN pip install --prefix=/install --no-cache-dir -r requirements.txt
 
 # ============================================================================
 # Stage 2: Runtime - Production image
@@ -22,13 +22,13 @@ FROM python:3.11-slim
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app/backend \
-    PATH=/root/.local/bin:$PATH
+    PYTHONPATH=/app/backend:/install/lib/python3.11/site-packages \
+    PATH=/install/bin:$PATH
 
 WORKDIR /app
 
 # Copy installed packages from builder
-COPY --from=builder /root/.local /root/.local
+COPY --from=builder /install /install
 
 # Copy application code
 COPY backend/ ./backend/
@@ -48,4 +48,4 @@ HEALTHCHECK --interval=30s --timeout=5s --retries=5 --start-period=10s \
 
 EXPOSE 5000
 
-CMD ["python", "backend/app.py"]
+CMD ["gunicorn", "--worker-class", "eventlet", "--workers", "1", "--bind", "0.0.0.0:5000", "backend.app:app"]

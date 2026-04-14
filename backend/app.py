@@ -76,12 +76,15 @@ _DEFAULT_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://localhost:5174",
     "http://localhost:3000",
+    "http://localhost:8080",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5174",
     "http://127.0.0.1:3000",
+    "http://127.0.0.1:8080",
     "http://10.17.20.172:5173",
     "http://10.17.20.172:5174",
     "http://10.17.20.172:3000",
+    "http://10.17.20.172:8080",
 ]
 
 
@@ -108,7 +111,7 @@ jwt = JWTManager(app)
 
 try:
     from flask_socketio import SocketIO, join_room
-    socketio = SocketIO(app, cors_allowed_origins=_ALLOWED_ORIGINS, async_mode='threading')
+    socketio = SocketIO(app, cors_allowed_origins=_ALLOWED_ORIGINS)
     from socketio_events import register_socketio_events
 
     @socketio.on('join_user_room')
@@ -737,6 +740,12 @@ if __name__ == '__main__':
     host = os.getenv('APP_HOST', '0.0.0.0')
     port = int(os.getenv('APP_PORT', '5000'))
     if socketio:
-        socketio.run(app, debug=True, host=host, port=port)
+        socketio.run(
+            app,
+            debug=_env_bool('FLASK_DEBUG', False),
+            host=host,
+            port=port,
+            allow_unsafe_werkzeug=True,
+        )
     else:
         app.run(debug=True, host=host, port=port)

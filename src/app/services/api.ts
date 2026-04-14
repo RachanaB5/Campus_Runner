@@ -2,7 +2,7 @@ const rawApiBaseUrl = (import.meta as ImportMeta & {
   env?: Record<string, string | undefined>;
 }).env?.VITE_API_BASE_URL;
 
-const API_BASE_URL = (rawApiBaseUrl?.trim() || 'http://localhost:5000/api').replace(/\/$/, '');
+const API_BASE_URL = (rawApiBaseUrl?.trim() || '/api').replace(/\/$/, '');
 
 const retryAttempts = Number(
   (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env

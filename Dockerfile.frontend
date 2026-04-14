@@ -1,7 +1,7 @@
 # ============================================================================
 # Stage 1: Builder - Build React/Vite application
 # ============================================================================
-FROM node:20-alpine as builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -25,10 +25,9 @@ COPY nginx-default.conf /etc/nginx/conf.d/default.conf
 # Copy built application from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Create non-root user for security
-RUN addgroup -g 1001 -S nginx && \
-    adduser -S -D -H -u 1001 -h /var/cache/nginx -s /sbin/nologin -c "nginx user" -G nginx nginx && \
-    chown -R nginx:nginx /var/cache/nginx /var/log/nginx /etc/nginx
+# The nginx image already includes an nginx user/group; just harden permissions.
+RUN chown -R nginx:nginx /var/cache/nginx /var/log/nginx /etc/nginx /usr/share/nginx/html \
+    && touch /tmp/nginx.pid && chown nginx:nginx /tmp/nginx.pid
 
 USER nginx
 
