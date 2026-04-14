@@ -1,9 +1,19 @@
+# Agents / GitHub Copilot config
+.agents/
+.github/
+
+# Reference files
+reference/
+
 # Python
 __pycache__/
 *.pyc
 *.pyo
 .venv/
 *.egg-info/
+.pytest_cache/
+htmlcov/
+*.log
 
 # Database
 *.db
@@ -28,3 +38,4 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+.amazonq/
