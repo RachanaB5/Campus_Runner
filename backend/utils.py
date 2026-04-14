@@ -89,8 +89,16 @@ def _get_otp_theme(value):
 
 def build_otp_email_html(otp, purpose, recipient_name=None, extra_details=None):
         theme = _get_otp_theme(purpose)
-        safe_name = escape((recipient_name or 'there').strip())
+        safe_name = escape((recipient_name or 'Customer').strip())
         safe_otp = escape(str(otp))
+        action_message = {
+                'profile_signup': 'verify your email address',
+                'profile_password_reset': 'reset your password',
+                'profile_update': 'confirm your profile changes',
+                'order_pickup': 'confirm order pickup',
+                'order_delivery': 'confirm your delivery',
+        }.get(_normalize_otp_theme_key(purpose), 'verify your account')
+
         details_html = ''
         for item in extra_details or []:
                 if isinstance(item, dict):
@@ -101,78 +109,70 @@ def build_otp_email_html(otp, purpose, recipient_name=None, extra_details=None):
                         value = escape(str(item[1]))
                 details_html += f'''
                         <tr>
-                                <td style="padding: 0 0 12px 0;">
-                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse: collapse;">
-                                                <tr>
-                                                        <td style="padding: 14px 16px; background: #ffffff; border: 1px solid rgba(0,0,0,0.06); border-radius: 16px;">
-                                                                <div style="font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b; margin-bottom: 6px;">{label}</div>
-                                                                <div style="font-size: 15px; font-weight: 700; color: #0f172a; line-height: 1.5;">{value}</div>
-                                                        </td>
-                                                </tr>
-                                        </table>
+                                <td style="padding: 10px 14px; border: 1px solid #e5e7eb;">
+                                        <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px;">{label}</div>
+                                        <div style="font-size: 14px; color: #111827; font-weight: 600;">{value}</div>
                                 </td>
                         </tr>
                 '''
 
+        details_section = ''
+        if details_html:
+                details_section = f'''
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse: collapse; margin: 18px 0 0 0;">
+                    {details_html}
+                </table>
+                '''
+
         return f'''
         <html>
-            <body style="margin:0; padding:0; background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%); font-family: Arial, Helvetica, sans-serif; color:#0f172a;">
-                <div style="display:none; max-height:0; overflow:hidden; opacity:0; color:transparent;">
-                    {theme['title']} - your Campus Runner one-time code
-                </div>
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%); padding: 32px 12px;">
+            <body style="margin:0; padding:0; background:#f6f9fc; font-family:-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Ubuntu, sans-serif;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding: 24px 10px;">
                     <tr>
                         <td align="center">
-                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 680px; background: #ffffff; border-radius: 28px; overflow: hidden; box-shadow: 0 18px 48px rgba(15, 23, 42, 0.12); border: 1px solid rgba(15, 23, 42, 0.06);">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; background: #ffffff; border: 1px solid #e6ebf1;">
                                 <tr>
-                                    <td style="background: linear-gradient(135deg, {theme['accent']} 0%, {theme['accent_dark']} 100%); padding: 28px 32px; color:#ffffff;">
-                                        <div style="font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.9; margin-bottom: 10px;">{escape(theme['eyebrow'])}</div>
-                                        <div style="font-size: 30px; font-weight: 800; line-height: 1.2; margin-bottom: 8px;">{escape(theme['title'])}</div>
-                                        <div style="font-size: 15px; line-height: 1.6; max-width: 540px; opacity: 0.95;">{escape(theme['summary'])}</div>
+                                    <td style="padding: 24px 36px; border-bottom: 1px solid #e6ebf1;">
+                                        <div style="font-size: 24px; font-weight: 700; color: #111827;">Campus Runner</div>
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td style="padding: 32px; background: #ffffff;">
-                                        <div style="margin-bottom: 18px; font-size: 16px; line-height: 1.7; color:#334155;">
-                                            Hi <strong style="color:#0f172a;">{safe_name}</strong>,
-                                            <br />
-                                            {escape(theme['code_hint'])}
-                                        </div>
+                                    <td style="padding: 28px 36px;">
+                                        <div style="font-size: 25px; font-weight: 600; color: #111827; margin-bottom: 16px;">{escape(theme['title'])}</div>
+                                        <div style="font-size: 16px; color: #4b5563; line-height: 1.65; margin-bottom: 14px;">Hi {safe_name},</div>
+                                        <div style="font-size: 16px; color: #4b5563; line-height: 1.65; margin-bottom: 18px;">Use the following code to {action_message}:</div>
 
-                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 22px 0 16px 0;">
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 10px 0 4px 0;">
                                             <tr>
-                                                <td align="center" style="padding: 8px 12px; background: {theme['surface']}; border: 1px solid rgba(0,0,0,0.05); border-radius: 22px;">
-                                                    <div style="font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: {theme['accent_dark']}; font-weight: 800; margin-bottom: 10px;">{escape(theme['code_label'])}</div>
-                                                    <div style="font-size: 42px; letter-spacing: 0.42em; font-weight: 900; color: {theme['accent_dark']}; padding-left: 0.42em; line-height: 1.15;">{safe_otp}</div>
+                                                <td align="center" style="background: #f4f4f5; border-radius: 8px; padding: 22px 12px;">
+                                                    <div style="font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #111827; font-family: monospace;">{safe_otp}</div>
                                                 </td>
                                             </tr>
                                         </table>
 
-                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse: collapse; margin-top: 6px;">
-                                            {details_html}
-                                        </table>
+                                        <div style="font-size: 13px; color: #6b7280; text-align: center; margin: 10px 0 6px 0;">This code expires in 10 minutes.</div>
+                                        {details_section}
 
-                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top: 10px;">
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top: 20px;">
                                             <tr>
-                                                <td style="padding: 18px 16px; background: #f8fafc; border-radius: 18px; border: 1px solid rgba(15, 23, 42, 0.06);">
-                                                    <div style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #64748b; font-weight: 800; margin-bottom: 8px;">Why this email</div>
-                                                    <div style="font-size: 15px; line-height: 1.7; color: #334155;">
-                                                        {escape(theme['summary'])}
+                                                <td style="background: #fef3c7; border-radius: 8px; padding: 14px;">
+                                                    <div style="font-size: 13px; color: #92400e; line-height: 1.7;">
+                                                        <strong>Security Tips</strong><br/>
+                                                        - Never share this code with anyone<br/>
+                                                        - Campus Runner will never ask for OTP over phone<br/>
+                                                        - This code is for one-time use only
                                                     </div>
                                                 </td>
                                             </tr>
                                         </table>
 
-                                        <div style="margin-top: 20px; font-size: 13px; line-height: 1.7; color:#64748b;">
-                                            {escape(theme['footer'])}
-                                        </div>
+                                        <div style="font-size: 14px; color: #6b7280; line-height: 1.7; margin-top: 18px;">{escape(theme['footer'])}</div>
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td style="padding: 18px 32px 28px 32px; background: #ffffff; border-top: 1px solid rgba(15, 23, 42, 0.06);">
-                                        <div style="font-size: 12px; line-height: 1.7; color:#94a3b8; text-align:center;">
-                                            Campus Runner - Secure verification for campus food ordering
-                                        </div>
+                                    <td style="padding: 22px 36px; border-top: 1px solid #e6ebf1;">
+                                        <div style="font-size: 12px; line-height: 1.6; color: #8898aa;">Need help? Contact support@campusrunner.com</div>
+                                        <div style="font-size: 12px; line-height: 1.6; color: #8898aa;">&copy; {datetime.now().year} Campus Runner. All rights reserved.</div>
                                     </td>
                                 </tr>
                             </table>
@@ -289,10 +289,10 @@ def build_order_confirmation_email_html(user_name, order_number, order_details, 
     items_html = ""
     for item in order_details.get('items', []):
         items_html += f"""
-        <tr>
-            <td style="padding: 12px 0; border-bottom: 1px solid #e2e8f0;">{escape(str(item.get('food_name', 'Item')))}</td>
-            <td style="padding: 12px 0; border-bottom: 1px solid #e2e8f0; text-align: center;">{escape(str(item.get('quantity', 0)))}</td>
-            <td style="padding: 12px 0; border-bottom: 1px solid #e2e8f0; text-align: right;">Rs. {float(item.get('total_price', 0)):.2f}</td>
+        <tr style="border-bottom: 1px solid #e5e7eb;">
+            <td style="padding: 12px 0; color: #111827;">{escape(str(item.get('food_name', 'Item')))}</td>
+            <td style="padding: 12px 0; text-align: center; color: #4b5563;">{escape(str(item.get('quantity', 0)))}</td>
+            <td style="padding: 12px 0; text-align: right; color: #111827;">Rs. {float(item.get('total_price', 0)):.2f}</td>
         </tr>
         """
 
@@ -301,113 +301,100 @@ def build_order_confirmation_email_html(user_name, order_number, order_details, 
         label = escape(str(otp_item.get('label', 'OTP')))
         value = escape(str(otp_item.get('value', '')))
         hint = escape(str(otp_item.get('hint', '')))
-        accent = otp_item.get('accent', '#0F172A')
-        surface = otp_item.get('surface', '#F8FAFC')
+        accent = otp_item.get('accent', '#1f2937')
+        surface = otp_item.get('surface', '#f9fafb')
         otp_cards_html += f"""
-        <td valign="top" width="50%" style="padding: 0 8px 12px 0;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse: collapse;">
-            <tr>
-              <td style="padding: 16px; background: {surface}; border-radius: 18px; border: 1px solid rgba(15,23,42,0.06);">
-                <div style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #475569; font-weight: 800; margin-bottom: 10px;">{label}</div>
-                <div style="font-size: 32px; letter-spacing: 0.42em; padding-left: 0.42em; font-weight: 900; color: {accent}; line-height: 1.15; margin-bottom: 10px;">{value}</div>
-                <div style="font-size: 13px; line-height: 1.7; color: #475569;">{hint}</div>
-              </td>
-            </tr>
-          </table>
-        </td>
+        <tr>
+          <td style="padding: 14px; background: {surface}; border: 1px solid #e5e7eb; border-radius: 8px;">
+            <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; margin-bottom: 6px;">{label}</div>
+            <div style="font-size: 30px; letter-spacing: 0.26em; font-weight: 700; color: {accent}; line-height: 1.2; margin-bottom: 8px;">{value}</div>
+            <div style="font-size: 13px; line-height: 1.6; color: #4b5563;">{hint}</div>
+          </td>
+        </tr>
         """
 
     otp_section = ""
     if otp_cards_html:
         otp_section = f"""
         <div style="margin: 24px 0 8px 0;">
-          <div style="font-size: 14px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: #0f172a; margin-bottom: 12px;">Verification Codes</div>
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse: collapse;">
-            <tr>
-              {otp_cards_html}
-            </tr>
+          <div style="font-size: 14px; font-weight: 700; color: #111827; margin-bottom: 12px;">Verification Codes</div>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse: separate; border-spacing: 0 8px;">
+            {otp_cards_html}
           </table>
         </div>
         """
 
     return f"""
     <html>
-        <head>
-            <style>
-                body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #0f172a; margin: 0; padding: 0; background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%); }}
-                .container {{ max-width: 700px; margin: 0 auto; padding: 24px 14px; }}
-                .shell {{ background: #ffffff; border-radius: 28px; overflow: hidden; box-shadow: 0 18px 48px rgba(15, 23, 42, 0.12); border: 1px solid rgba(15, 23, 42, 0.06); }}
-                .header {{ background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: white; padding: 28px 32px; }}
-                .eyebrow {{ font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.9; margin-bottom: 10px; }}
-                .title {{ font-size: 30px; line-height: 1.2; font-weight: 800; margin-bottom: 8px; }}
-                .subtitle {{ font-size: 15px; line-height: 1.6; opacity: 0.95; max-width: 560px; }}
-                .content {{ padding: 32px; }}
-                .order-number {{ font-size: 28px; font-weight: 900; letter-spacing: 0.03em; margin: 8px 0 4px 0; color: #ea580c; }}
-                .section {{ background: #f8fafc; padding: 18px; margin: 18px 0; border-radius: 20px; border: 1px solid rgba(15, 23, 42, 0.06); }}
-                .section-title {{ font-size: 14px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: #0f172a; margin-bottom: 10px; }}
-                table.order-table {{ width: 100%; border-collapse: collapse; }}
-                .footer {{ padding: 20px 32px 28px 32px; border-top: 1px solid rgba(15, 23, 42, 0.06); color: #94a3b8; font-size: 12px; text-align: center; }}
-                .pill {{ display: inline-block; background: #ea580c; color: white; padding: 9px 14px; border-radius: 999px; font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="shell">
-                    <div class="header">
-                        <div class="eyebrow">Order Confirmation</div>
-                        <div class="title">Your Campus Runner order is confirmed</div>
-                        <div class="subtitle">We've received your order and are getting it ready. Keep this email handy for tracking and verification.</div>
+      <body style="margin:0; padding:0; background:#f6f9fc; font-family:-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Ubuntu, sans-serif;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding: 24px 10px;">
+          <tr>
+            <td align="center">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 620px; background:#ffffff; border: 1px solid #e6ebf1;">
+                <tr>
+                  <td style="padding: 22px 32px; border-bottom: 1px solid #e6ebf1;">
+                    <div style="font-size: 24px; font-weight: 700; color: #111827;">Campus Runner</div>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td style="padding: 24px 32px; background: #f0fdf4; text-align: center;">
+                    <div style="font-size: 28px; color: #16a34a; line-height: 1; margin-bottom: 10px;">&#10003;</div>
+                    <div style="font-size: 24px; font-weight: 600; color: #16a34a; margin-bottom: 8px;">Order Confirmed</div>
+                    <div style="font-size: 15px; color: #166534;">Thank you for your order. We are preparing it now.</div>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td style="padding: 28px 32px;">
+                    <div style="font-size: 16px; color: #4b5563; line-height: 1.65; margin-bottom: 16px;">Hi {escape(str(user_name))},</div>
+
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 22px;">
+                      <tr>
+                        <td style="padding: 14px;">
+                          <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.08em;">Order Number</div>
+                          <div style="font-size: 18px; font-weight: 700; color: #111827; margin: 6px 0 12px 0;">#{escape(str(order_number))}</div>
+                          <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.08em;">Estimated Delivery</div>
+                          <div style="font-size: 15px; color: #111827; margin-top: 6px;">{escape(str(estimated_delivery_time))}</div>
+                        </td>
+                      </tr>
+                    </table>
+
+                    {otp_section}
+
+                    <div style="font-size: 16px; font-weight: 600; color: #111827; margin-bottom: 10px;">Order Summary</div>
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse: collapse; margin-bottom: 16px;">
+                      <tr style="border-bottom: 1px solid #d1d5db;">
+                        <th style="padding: 10px 0; text-align: left; font-size: 13px; color: #6b7280;">Item</th>
+                        <th style="padding: 10px 0; text-align: center; font-size: 13px; color: #6b7280;">Qty</th>
+                        <th style="padding: 10px 0; text-align: right; font-size: 13px; color: #6b7280;">Price</th>
+                      </tr>
+                      {items_html}
+                      <tr style="border-top: 1px solid #d1d5db;">
+                        <td colspan="2" style="padding: 12px 0; text-align: right; font-weight: 700; color: #111827;">Total</td>
+                        <td style="padding: 12px 0; text-align: right; font-weight: 700; color: #111827;">Rs. {float(total_amount):.2f}</td>
+                      </tr>
+                    </table>
+
+                    <div style="font-size: 16px; font-weight: 600; color: #111827; margin-bottom: 10px;">Shipping Address</div>
+                    <div style="font-size: 14px; line-height: 1.7; color: #4b5563; background:#f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px;">
+                      {escape(str(order_details.get('delivery_address', 'N/A')))}<br/>
+                      Phone: {escape(str(order_details.get('customer_phone', 'N/A')))}
                     </div>
+                  </td>
+                </tr>
 
-                    <div class="content">
-                        <p style="font-size: 16px; line-height: 1.7; color: #334155; margin-top: 0;">Hi <strong style="color:#0f172a;">{escape(str(user_name))}</strong>, your order is on its way through the Campus Runner flow.</p>
-
-                        <div class="section" style="text-align: center;">
-                            <div class="section-title">Order Number</div>
-                            <div class="order-number">#{escape(str(order_number))}</div>
-                            <div><span class="pill">Confirmed</span></div>
-                            <div style="margin-top: 12px; font-size: 15px; line-height: 1.7; color: #475569;"><strong>Estimated Delivery:</strong> {escape(str(estimated_delivery_time))}</div>
-                        </div>
-
-                        {otp_section}
-
-                        <div class="section">
-                            <div class="section-title">Order Items</div>
-                            <table class="order-table">
-                                <thead>
-                                    <tr style="background: #e2e8f0;">
-                                        <th style="padding: 12px 0; text-align: left;">Item</th>
-                                        <th style="padding: 12px 0; text-align: center;">Qty</th>
-                                        <th style="padding: 12px 0; text-align: right;">Price</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {items_html}
-                                </tbody>
-                                <tfoot>
-                                    <tr style="font-weight: 900;">
-                                        <td colspan="2" style="padding: 12px 0; text-align: right;">Total:</td>
-                                        <td style="padding: 12px 0; text-align: right; color: #ea580c; font-size: 18px;">Rs. {float(total_amount):.2f}</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-
-                        <div class="section">
-                            <div class="section-title">Delivery Details</div>
-                            <div style="font-size: 15px; line-height: 1.8; color: #334155;">{escape(str(order_details.get('delivery_address', 'N/A')))}</div>
-                            <div style="margin-top: 10px; font-size: 15px; line-height: 1.8; color: #334155;"><strong>Phone:</strong> {escape(str(order_details.get('customer_phone', 'N/A')))}</div>
-                        </div>
-
-                        <div style="font-size: 14px; line-height: 1.7; color: #64748b;">You can track your order status in the Campus Runner app. If a verification code is shown above, keep it private until the runner or staff asks for it.</div>
-                    </div>
-
-                    <div class="footer">
-                        Campus Runner - Secure food ordering and delivery for campus life
-                    </div>
-                </div>
-            </div>
-        </body>
+                <tr>
+                  <td style="padding: 22px 32px; border-top: 1px solid #e6ebf1;">
+                    <div style="font-size: 12px; color:#8898aa; line-height: 1.6;">Questions about your order? Contact support@campusrunner.com</div>
+                    <div style="font-size: 12px; color:#8898aa; line-height: 1.6;">&copy; {datetime.now().year} Campus Runner. All rights reserved.</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
     </html>
     """
 
@@ -613,75 +600,46 @@ def send_welcome_email(user_email, user_name, app=None):
             from app import app as flask_app
             app = flask_app
         
-        safe_name = escape((user_name or 'there').strip())
+        safe_name = escape((user_name or 'Customer').strip())
         
         html = f"""
         <html>
-            <body style="margin:0; padding:0; background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%); font-family: Arial, Helvetica, sans-serif; color:#0f172a;">
-                <div style="display:none; max-height:0; overflow:hidden; opacity:0; color:transparent;">
-                    Welcome to Campus Runner - start ordering today!
-                </div>
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%); padding: 32px 12px;">
+            <body style="margin:0; padding:0; background:#f6f9fc; font-family:-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Ubuntu, sans-serif;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding: 24px 10px;">
                     <tr>
                         <td align="center">
-                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 680px; background: #ffffff; border-radius: 28px; overflow: hidden; box-shadow: 0 18px 48px rgba(15, 23, 42, 0.12); border: 1px solid rgba(15, 23, 42, 0.06);">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; background: #ffffff; border: 1px solid #e6ebf1;">
                                 <tr>
-                                    <td style="background: linear-gradient(135deg, #F97316 0%, #C2410C 100%); padding: 28px 32px; color:#ffffff;">
-                                        <div style="font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.9; margin-bottom: 10px;">Welcome Aboard</div>
-                                        <div style="font-size: 30px; font-weight: 800; line-height: 1.2; margin-bottom: 8px;">Join Campus Runner Today</div>
-                                        <div style="font-size: 15px; line-height: 1.6; max-width: 540px; opacity: 0.95;">Your account is ready. Start discovering amazing food from your favorite campus restaurants!</div>
+                                    <td style="padding: 24px 36px; border-bottom: 1px solid #e6ebf1;">
+                                        <div style="font-size: 24px; font-weight: 700; color: #111827;">Campus Runner</div>
                                     </td>
                                 </tr>
+
                                 <tr>
-                                    <td style="padding: 32px; background: #ffffff;">
-                                        <div style="margin-bottom: 18px; font-size: 16px; line-height: 1.7; color:#334155;">
-                                            Hi <strong style="color:#0f172a;">{safe_name}</strong>,
-                                            <br />
-                                            Welcome to Campus Runner! Your account is all set up and ready to go. Let's start ordering some delicious food!
-                                        </div>
-
-                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 24px 0;">
-                                            <tr>
-                                                <td style="padding: 16px; background: #FFF7ED; border: 1px solid rgba(0,0,0,0.05); border-radius: 20px; margin-bottom: 12px;">
-                                                    <div style="font-size: 14px; font-weight: 800; color: #C2410C; margin-bottom: 8px;">Fast Delivery</div>
-                                                    <div style="font-size: 14px; line-height: 1.7; color: #334155;">Get your order delivered in 30-45 minutes. Quick, reliable, and always hot!</div>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td style="padding: 16px; background: #FFF7ED; border: 1px solid rgba(0,0,0,0.05); border-radius: 20px; margin-bottom: 12px;">
-                                                    <div style="font-size: 14px; font-weight: 800; color: #C2410C; margin-bottom: 8px;">Wide Menu</div>
-                                                    <div style="font-size: 14px; line-height: 1.7; color: #334155;">Browse hundreds of dishes from multiple restaurants all in one place.</div>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td style="padding: 16px; background: #FFF7ED; border: 1px solid rgba(0,0,0,0.05); border-radius: 20px; margin-bottom: 12px;">
-                                                    <div style="font-size: 14px; font-weight: 800; color: #C2410C; margin-bottom: 8px;">Great Deals</div>
-                                                    <div style="font-size: 14px; line-height: 1.7; color: #334155;">Enjoy exclusive discounts, daily offers, and earn reward points on every order!</div>
-                                                </td>
-                                            </tr>
-                                        </table>
-
-                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 24px 0;">
-                                            <tr>
-                                                <td style="padding: 18px 16px; background: #f8fafc; border-radius: 18px; border: 1px solid rgba(15, 23, 42, 0.06);">
-                                                    <div style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #64748b; font-weight: 800; margin-bottom: 8px;">Getting Started</div>
-                                                    <div style="font-size: 15px; line-height: 1.7; color: #334155;">
-                                                        Browse our partner restaurants, add your favorite dishes to your cart, and checkout securely. Your first order is just a few clicks away!
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        </table>
-
-                                        <div style="margin-top: 20px; font-size: 13px; line-height: 1.7; color:#64748b;">
-                                            If you have any questions or need help, our support team is here for you. Happy ordering!
-                                        </div>
+                                    <td style="background: #1a1a1a; padding: 40px 36px; text-align: center;">
+                                        <div style="font-size: 30px; font-weight: 700; color: #ffffff; margin-bottom: 8px;">Welcome to Campus Runner!</div>
+                                        <div style="font-size: 16px; color: #a3a3a3;">We are thrilled to have you join our community</div>
                                     </td>
                                 </tr>
+
                                 <tr>
-                                    <td style="padding: 18px 32px 28px 32px; background: #ffffff; border-top: 1px solid rgba(15, 23, 42, 0.06);">
-                                        <div style="font-size: 12px; line-height: 1.7; color:#94a3b8; text-align:center;">
-                                            Campus Runner - Fast food ordering for campus life
-                                        </div>
+                                    <td style="padding: 30px 36px;">
+                                        <div style="font-size: 16px; color: #4b5563; line-height: 1.65; margin-bottom: 14px;">Hi {safe_name},</div>
+                                        <div style="font-size: 16px; color: #4b5563; line-height: 1.65; margin-bottom: 20px;">Your account has been successfully created. You can now browse menus, track orders, and earn rewards with every purchase.</div>
+
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 20px 0; border-collapse: separate; border-spacing: 0 10px;">
+                                            <tr><td style="padding: 14px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;"><strong style="color:#111827;">Browse Canteens</strong><div style="margin-top:6px; color:#6b7280; font-size:14px;">Explore dishes from your favorite campus spots.</div></td></tr>
+                                            <tr><td style="padding: 14px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;"><strong style="color:#111827;">Fast Delivery</strong><div style="margin-top:6px; color:#6b7280; font-size:14px;">Track your runner in real-time from preparation to doorstep.</div></td></tr>
+                                            <tr><td style="padding: 14px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;"><strong style="color:#111827;">Rewards</strong><div style="margin-top:6px; color:#6b7280; font-size:14px;">Collect points and unlock special offers.</div></td></tr>
+                                        </table>
+
+                                        <div style="font-size: 14px; color:#6b7280; line-height: 1.7;">Need help? Contact support@campusrunner.com anytime.</div>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td style="padding: 22px 36px; border-top: 1px solid #e6ebf1;">
+                                        <div style="font-size: 12px; color: #8898aa; line-height: 1.6;">&copy; {datetime.now().year} Campus Runner. All rights reserved.</div>
                                     </td>
                                 </tr>
                             </table>

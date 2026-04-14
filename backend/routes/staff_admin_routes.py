@@ -23,7 +23,7 @@ def get_dashboard_stats():
         total_orders = Order.query.count()
         pending_orders = Order.query.filter_by(status='pending').count()
         completed_orders = Order.query.filter_by(status='delivered').count()
-        total_revenue = sum(order.total_amount for order in Order.query.filter_by(status='delivered').all())
+        total_revenue = db.session.query(db.func.sum(Order.total_amount)).filter_by(status='delivered').scalar() or 0.0
         
         return jsonify({
             'total_orders': total_orders,
@@ -171,8 +171,11 @@ def update_user_role(user_id):
         if not target_user:
             return jsonify({'error': 'User not found'}), 404
         
-        data = request.get_json()
-        target_user.role = data.get('role')
+        new_role = data.get('role')
+        allowed_roles = {'customer', 'runner', 'staff', 'admin'}
+        if new_role not in allowed_roles:
+            return jsonify({'error': f'Invalid role. Must be one of: {sorted(allowed_roles)}'}), 400
+        target_user.role = new_role
         db.session.commit()
         
         return jsonify({
@@ -242,9 +245,8 @@ def get_sales_report():
         
         # Get completed orders
         completed_orders = Order.query.filter_by(status='delivered').all()
-        
-        total_sales = sum(order.total_amount for order in completed_orders)
         total_orders = len(completed_orders)
+        total_sales = db.session.query(db.func.sum(Order.total_amount)).filter_by(status='delivered').scalar() or 0.0
         average_order_value = total_sales / total_orders if total_orders > 0 else 0
         
         return jsonify({

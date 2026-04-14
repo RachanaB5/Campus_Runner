@@ -11,7 +11,10 @@ notification_bp = Blueprint('notification', __name__)
 def list_notifications():
     user_id = get_jwt_identity()
     unread_only = (request.args.get('unread') or '').lower() == 'true'
-    limit = min(int(request.args.get('limit', 20)), 50)
+    try:
+        limit = min(int(request.args.get('limit', 20)), 50)
+    except (TypeError, ValueError):
+        limit = 20
     query = Notification.query.filter_by(user_id=user_id)
     if unread_only:
         query = query.filter_by(is_read=False)

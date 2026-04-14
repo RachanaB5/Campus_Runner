@@ -3,7 +3,6 @@ from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identi
 from models import db, User, RewardPoints, Order, Runner
 import uuid
 from datetime import datetime, timedelta
-import random
 import re
 import os
 
@@ -20,7 +19,8 @@ def normalize_email(value):
 
 
 def generate_otp():
-    return ''.join(random.choices('0123456789', k=6))
+    import secrets
+    return ''.join(secrets.choice('0123456789') for _ in range(6))
 
 
 def _dev_mode_expose_otp():

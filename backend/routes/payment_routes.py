@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 import re
 import uuid
-import os
 
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
@@ -9,14 +8,14 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 from models import db, Order, Payment, User, SavedPaymentMethod
 from services.notification_service import notify_runners_new_order
 from services.payment_service import (
-    create_razorpay_order,
-    get_razorpay_key_id,
     hash_card_number,
     is_valid_luhn,
-    issue_refund,
     normalize_card_number,
     validate_card_expiry,
     verify_razorpay_signature,
+    create_razorpay_order,
+    get_razorpay_key_id,
+    issue_refund,
 )
 
 payment_bp = Blueprint('payment', __name__)
@@ -34,33 +33,30 @@ def _get_user_order(order_id: str, user_id: str) -> Order | None:
 
 def _rate_limit_payment_attempts(user_id: str) -> bool:
     cutoff = datetime.utcnow() - timedelta(minutes=10)
-    attempt_count = Payment.query.filter(
+    return Payment.query.filter(
         Payment.user_id == user_id,
         Payment.created_at >= cutoff,
-    ).count()
-    return attempt_count < 5
+    ).count() < 5
 
 
-def _serialize_error(message: str, status_code: int = 400):
-    return jsonify({'error': message, 'message': message}), status_code
+def _err(message: str, status: int = 400):
+    return jsonify({'error': message, 'message': message}), status
 
 
-def _payment_reference(method: str) -> str:
-    return f'{method}_order_{uuid.uuid4().hex[:16]}'
+def _mock_order_id() -> str:
+    return f'order_mock_{uuid.uuid4().hex[:16]}'
 
 
-def _should_mock_razorpay() -> bool:
-    key_id = os.getenv('RAZORPAY_KEY_ID', '')
-    key_secret = os.getenv('RAZORPAY_KEY_SECRET', '')
-    return (
-        not key_id
-        or not key_secret
-        or 'placeholder' in key_id
-        or 'placeholder' in key_secret
-    )
+def _mock_payment_id() -> str:
+    return f'pay_mock_{uuid.uuid4().hex[:12]}'
 
+
+# ---------------------------------------------------------------------------
+# POST /api/payment/initiate
+# ---------------------------------------------------------------------------
 
 @payment_bp.route('/initiate', methods=['POST'])
+@payment_bp.route('/create-order', methods=['POST'])
 @jwt_required()
 def initiate_payment():
     user_id = get_jwt_identity()
@@ -70,34 +66,36 @@ def initiate_payment():
     saved_method_id = data.get('saved_method_id')
 
     if method not in {'cod', 'upi', 'card'}:
-        return _serialize_error('Invalid payment method')
+        return _err('Invalid payment method')
     if not _rate_limit_payment_attempts(user_id):
-        return _serialize_error('Too many payment attempts. Please wait a few minutes.', 429)
+        return _err('Too many payment attempts. Please wait a few minutes.', 429)
 
     order = _get_user_order(order_id, user_id)
     if not order:
-        return _serialize_error('Order not found', 404)
+        return _err('Order not found', 404)
     if order.status not in {'placed', 'pending', 'confirmed'}:
-        return _serialize_error('Order cannot be paid in its current state')
+        return _err('Order cannot be paid in its current state')
 
-    amount = int(round(float(order.total_amount or 0) * 100))
+    amount_paise = int(round(float(order.total_amount or 0) * 100))
+
     saved_method = None
     if saved_method_id:
         saved_method = SavedPaymentMethod.query.filter_by(id=saved_method_id, user_id=user_id).first()
         if not saved_method:
-            return _serialize_error('Saved payment method not found', 404)
+            return _err('Saved payment method not found', 404)
         if saved_method.type != method:
-            return _serialize_error('Saved payment method type mismatch')
+            return _err('Saved payment method type mismatch')
 
     try:
+        # ------------------------------------------------------------------ COD
         if method == 'cod':
             payment = Payment(
                 id=str(uuid.uuid4()),
                 order_id=order.id,
                 user_id=user_id,
                 method='cod',
-                razorpay_order_id=_payment_reference('cod'),
-                amount=amount,
+                razorpay_order_id=f'cod_ref_{uuid.uuid4().hex[:16]}',
+                amount=amount_paise,
                 currency='INR',
                 status='pending',
             )
@@ -114,21 +112,23 @@ def initiate_payment():
                 'payment': payment.to_dict(),
             }), 200
 
+        # ------------------------------------------------------------------ UPI
         if method == 'upi':
             upi_id = (saved_method.upi_id if saved_method else (data.get('upi_id') or '')).strip()
             if not UPI_REGEX.match(upi_id):
-                return _serialize_error('Enter a valid UPI ID')
+                return _err('Enter a valid UPI ID')
 
-            razorpay_order = create_razorpay_order(amount=amount, receipt=order.id)
+            # Mock Razorpay order — replace create_razorpay_order call with real one when ready
+            mock_order = create_razorpay_order(amount=amount_paise, receipt=order.id)
             payment = Payment(
                 id=str(uuid.uuid4()),
                 order_id=order.id,
                 user_id=user_id,
                 method='upi',
-                amount=amount,
-                currency=razorpay_order.get('currency', 'INR'),
+                amount=amount_paise,
+                currency='INR',
                 status='pending',
-                razorpay_order_id=razorpay_order.get('id'),
+                razorpay_order_id=mock_order['id'],
                 upi_id=upi_id,
             )
             order.payment_method = 'upi'
@@ -143,12 +143,14 @@ def initiate_payment():
                 'amount': payment.amount,
                 'currency': payment.currency,
                 'upi_id': payment.upi_id,
-                'mock_checkout': _should_mock_razorpay() or str(payment.razorpay_order_id).startswith('order_dev_'),
-                'mock_payment_id': f'pay_dev_{uuid.uuid4().hex[:12]}',
-                'mock_signature': 'dev_signature',
+                # Always mock — remove this flag when real Razorpay keys are set
+                'mock_checkout': True,
+                'mock_payment_id': _mock_payment_id(),
+                'mock_signature': 'mock_signature',
                 'payment': payment.to_dict(),
             }), 200
 
+        # ------------------------------------------------------------------ CARD
         if saved_method:
             card_last4 = saved_method.card_last4
             card_number_hash = saved_method.card_number_hash
@@ -161,33 +163,32 @@ def initiate_payment():
             card_pin = str(data.get('card_pin') or '').strip()
 
             if not is_valid_luhn(card_number):
-                return _serialize_error('Enter a valid card number')
+                return _err('Enter a valid card number')
             if not card_holder_name:
-                return _serialize_error('Cardholder name is required')
+                return _err('Cardholder name is required')
             if not validate_card_expiry(card_expiry):
-                return _serialize_error('Card expiry is invalid or already expired')
+                return _err('Card expiry is invalid or already expired')
             if not CARD_PIN_REGEX.match(card_pin):
-                return _serialize_error('Card PIN must be 4 to 6 digits')
+                return _err('Card PIN must be 4 to 6 digits')
 
             card_last4 = card_number[-4:]
             card_number_hash = hash_card_number(card_number)
-            del card_pin
-            del card_number
+            del card_pin, card_number
 
         payment = Payment(
             id=str(uuid.uuid4()),
             order_id=order.id,
             user_id=user_id,
             method='card',
-            razorpay_order_id=_payment_reference('card'),
-            amount=amount,
+            razorpay_order_id=f'card_ref_{uuid.uuid4().hex[:16]}',
+            razorpay_payment_id=_mock_payment_id(),
+            amount=amount_paise,
             currency='INR',
             status='success',
             card_last4=card_last4,
             card_number_hash=card_number_hash,
             card_holder_name=card_holder_name,
             card_expiry=card_expiry,
-            razorpay_payment_id=f'card_txn_{uuid.uuid4().hex[:12]}',
         )
         order.payment_method = 'card'
         order.payment_status = 'paid'
@@ -202,10 +203,15 @@ def initiate_payment():
             'transaction_id': payment.razorpay_payment_id,
             'payment': payment.to_dict(),
         }), 200
+
     except Exception as exc:
         db.session.rollback()
-        return _serialize_error(str(exc), 500)
+        return _err(str(exc), 500)
 
+
+# ---------------------------------------------------------------------------
+# POST /api/payment/verify-upi  (mock: always succeeds)
+# ---------------------------------------------------------------------------
 
 @payment_bp.route('/verify-upi', methods=['POST'])
 @payment_bp.route('/verify', methods=['POST'])
@@ -214,26 +220,26 @@ def verify_upi_payment():
     user_id = get_jwt_identity()
     data = request.get_json() or {}
     razorpay_order_id = data.get('razorpay_order_id')
-    razorpay_payment_id = data.get('razorpay_payment_id')
-    razorpay_signature = data.get('razorpay_signature')
+    razorpay_payment_id = data.get('razorpay_payment_id') or _mock_payment_id()
+    razorpay_signature = data.get('razorpay_signature') or 'mock_signature'
 
     payment = Payment.query.filter_by(razorpay_order_id=razorpay_order_id, user_id=user_id).first()
     if not payment:
-        return _serialize_error('Payment order not found', 404)
+        return _err('Payment order not found', 404)
 
     order = _get_user_order(payment.order_id, user_id)
     if not order:
-        return _serialize_error('Order not found', 404)
+        return _err('Order not found', 404)
 
-    allow_mock_success = _should_mock_razorpay() or str(razorpay_order_id).startswith('order_dev_')
-    if not allow_mock_success and not verify_razorpay_signature(razorpay_order_id, razorpay_payment_id, razorpay_signature):
+    # Mock always passes — verify_razorpay_signature returns True for any non-empty signature
+    if not verify_razorpay_signature(razorpay_order_id, razorpay_payment_id, razorpay_signature):
         payment.status = 'failed'
         db.session.commit()
-        return _serialize_error('Invalid Razorpay signature')
+        return _err('Payment verification failed')
 
     try:
-        payment.razorpay_payment_id = razorpay_payment_id or f'pay_dev_{uuid.uuid4().hex[:12]}'
-        payment.razorpay_signature = razorpay_signature or 'dev_signature'
+        payment.razorpay_payment_id = razorpay_payment_id
+        payment.razorpay_signature = razorpay_signature
         payment.status = 'success'
         order.payment_status = 'paid'
         order.payment_method = 'upi'
@@ -247,16 +253,24 @@ def verify_upi_payment():
         }), 200
     except Exception as exc:
         db.session.rollback()
-        return _serialize_error(str(exc), 500)
+        return _err(str(exc), 500)
 
+
+# ---------------------------------------------------------------------------
+# GET /api/payment/history
+# ---------------------------------------------------------------------------
 
 @payment_bp.route('/history', methods=['GET'])
 @jwt_required()
 def payment_history():
     user_id = get_jwt_identity()
     payments = Payment.query.filter_by(user_id=user_id).order_by(Payment.created_at.desc()).all()
-    return jsonify({'payments': [payment.to_dict() for payment in payments]}), 200
+    return jsonify({'payments': [p.to_dict() for p in payments]}), 200
 
+
+# ---------------------------------------------------------------------------
+# POST /api/payment/refund/<payment_id>  (admin/staff only)
+# ---------------------------------------------------------------------------
 
 @payment_bp.route('/refund/<payment_id>', methods=['POST'])
 @jwt_required()
@@ -264,20 +278,22 @@ def refund_payment(payment_id):
     user_id = get_jwt_identity()
     user = User.query.get(user_id)
     if not user or user.role not in {'admin', 'staff'}:
-        return _serialize_error('Unauthorized', 403)
+        return _err('Unauthorized', 403)
 
     payment = Payment.query.filter(
         (Payment.id == payment_id) | (Payment.razorpay_payment_id == payment_id)
     ).first()
     if not payment:
-        return _serialize_error('Payment not found', 404)
+        return _err('Payment not found', 404)
 
     try:
+        # issue_refund is a no-op in mock mode; uncomment real Razorpay call in payment_service.py
         if payment.method in {'upi', 'card'} and payment.razorpay_payment_id:
             try:
                 issue_refund(payment.razorpay_payment_id)
             except Exception:
                 pass
+
         payment.status = 'refunded' if payment.method != 'cod' else 'cancelled'
         order = Order.query.get(payment.order_id)
         if order:
@@ -286,10 +302,4 @@ def refund_payment(payment_id):
         return jsonify({'success': True, 'payment': payment.to_dict()}), 200
     except Exception as exc:
         db.session.rollback()
-        return _serialize_error(str(exc), 500)
-
-
-@payment_bp.route('/create-order', methods=['POST'])
-@jwt_required()
-def create_order_alias():
-    return initiate_payment()
+        return _err(str(exc), 500)

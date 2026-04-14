@@ -91,8 +91,8 @@ def notify_runners_new_order(order: Order) -> None:
         import app as app_module
 
         if getattr(app_module, 'socketio', None):
-            app_module.socketio.emit('new_order_available', payload, room='runners_online')
-            app_module.socketio.emit('notification:new', payload, room='runners_online')
+            app_module.socketio.emit('new_order_available', payload, room='runners')
+            app_module.socketio.emit('notification:new', payload, room='runners')
             if customer_notification:
                 app_module.socketio.emit('notification:new', customer_notification.to_dict(), room=f'user:{order.customer_id}')
     except Exception:
@@ -113,7 +113,7 @@ def notify_order_taken(order: Order, runner_user: User) -> None:
         }
 
         if getattr(app_module, 'socketio', None):
-            app_module.socketio.emit('order_taken', {'order_id': order.id}, room='runners_online')
+            app_module.socketio.emit('order_taken', {'order_id': order.id}, room='runners')
             app_module.socketio.emit('order_accepted', payload, room=f'user:{order.customer_id}')
 
         notification = None

@@ -198,7 +198,7 @@ def confirm_checkout():
                 return jsonify({'error': f'Food item not found'}), 404
             
             quantity = int(item['quantity'])
-            unit_price = float(item.get('price', food.price))
+            unit_price = float(food.price)  # always use server-side price
             total_price = unit_price * quantity
             subtotal += total_price
             
@@ -376,29 +376,28 @@ def confirm_checkout():
 @checkout_bp.route('/summary', methods=['POST'])
 @jwt_required()
 def get_checkout_summary():
-    """Get checkout summary with validation status"""
+    """Get checkout summary with server-computed totals"""
     try:
-        user_id = get_jwt_identity()
-        
-        data = request.get_json()
+        data = request.get_json() or {}
         items = data.get('items', [])
-        
-        # Calculate totals
-        subtotal = 0
+
+        subtotal = 0.0
         for item in items:
-            subtotal += item.get('price', 0) * item.get('quantity', 0)
-        
-        tax_amount = round(subtotal * 0.05 * 100) / 100  # 5% tax
-        delivery_fee = 50 if subtotal < 500 else 0  # Free delivery above 500
-        final_total = subtotal + tax_amount + delivery_fee
-        
+            food = Food.query.get(item.get('food_id'))
+            if food:
+                subtotal += float(food.price) * int(item.get('quantity', 1))
+
+        tax_amount = round(subtotal * 0.05, 2)
+        delivery_fee = 50.0 if subtotal < 500 else 0.0
+        final_total = round(subtotal + tax_amount + delivery_fee, 2)
+
         return jsonify({
             'subtotal': subtotal,
             'tax_amount': tax_amount,
             'delivery_fee': delivery_fee,
             'final_total': final_total,
-            'discount_eligible': subtotal > 300  # Discount eligible above 300
+            'discount_eligible': subtotal > 300,
         }), 200
-    
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500

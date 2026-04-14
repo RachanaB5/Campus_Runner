@@ -1,8 +1,7 @@
 from models import db
 from datetime import datetime, timedelta
-import random
-import string
-
+import uuid
+import secrets
 class OrderOTP(db.Model):
     __tablename__ = 'order_otps'
     
@@ -33,15 +32,16 @@ class OrderOTP(db.Model):
     
     @staticmethod
     def generate_otp():
-        """Generate a 4-digit OTP"""
-        return ''.join(random.choices(string.digits, k=4))
+        """Generate a 4-digit OTP using secrets for cryptographic randomness"""
+        import secrets
+        return ''.join(secrets.choice('0123456789') for _ in range(4))
     
     @staticmethod
     def create_for_order(order_id, delivery_id, otp_type='delivery'):
         """Create OTP for pickup or delivery verification"""
         otp = OrderOTP.generate_otp()
         order_otp = OrderOTP(
-            id=str(__import__('uuid').uuid4()),
+            id=str(uuid.uuid4()),
             order_id=order_id,
             delivery_id=delivery_id,
             otp=otp,

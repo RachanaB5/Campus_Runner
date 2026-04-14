@@ -38,6 +38,7 @@ class RewardTransaction(db.Model):
     def to_dict(self):
         return {
             'id': self.id,
+            'type': self.transaction_type,
             'transaction_type': self.transaction_type,
             'points': self.points,
             'description': self.description,
