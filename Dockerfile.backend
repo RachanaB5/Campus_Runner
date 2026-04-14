@@ -1,17 +1,51 @@
-FROM python:3.11-slim
+# ============================================================================
+# Stage 1: Builder - Install dependencies
+# ============================================================================
+FROM python:3.11-slim as builder
 
 WORKDIR /app/backend
 
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install dependencies
 COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --user --no-cache-dir -r requirements.txt
 
-COPY backend/ .
-COPY .env.example ../.env.example
+# ============================================================================
+# Stage 2: Runtime - Production image
+# ============================================================================
+FROM python:3.11-slim
 
+# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app/backend
+    PYTHONPATH=/app/backend \
+    PATH=/root/.local/bin:$PATH
+
+WORKDIR /app
+
+# Copy installed packages from builder
+COPY --from=builder /root/.local /root/.local
+
+# Copy application code
+COPY backend/ ./backend/
+COPY .env.example ./
+
+# Create non-root user for security
+RUN useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app && \
+    mkdir -p /app/instance && \
+    chown -R appuser:appuser /app/instance
+
+USER appuser
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --retries=5 --start-period=10s \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health', timeout=3)" || exit 1
 
 EXPOSE 5000
 
-CMD ["python", "app.py"]
+CMD ["python", "backend/app.py"]

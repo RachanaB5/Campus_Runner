@@ -1,0 +1,23 @@
+# Development docker-compose override - use with: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+version: "3.9"
+
+services:
+  backend:
+    environment:
+      - FLASK_DEBUG=true
+      - LOG_LEVEL=DEBUG
+    volumes:
+      - ./backend:/app/backend:cached
+      - /app/backend/__pycache__
+    command: python -m flask run --host=0.0.0.0
+
+  frontend:
+    environment:
+      - VITE_ENVIRONMENT=development
+    volumes:
+      - ./src:/app/src:cached
+      - ./public:/app/public:cached
+      - /app/node_modules
+    # For development with hot reload
+    command: npm run dev
