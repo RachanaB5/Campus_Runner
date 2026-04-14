@@ -3,9 +3,12 @@ import { Search, ShoppingCart, X, Plus, Minus, Trash2, ArrowRight, Bike, MapPin 
 import { menuItems } from "../data/mockData";
 import { FoodCard } from "../components/FoodCard";
 import { FoodDetailModal } from "../components/FoodDetailModal";
+import { FoodCardSkeleton } from "../components/FoodCardSkeleton";
+import { CartDrawer } from "../components/CartDrawer";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router";
+import useSound from "use-sound";
 import * as api from "../services/api";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -77,35 +80,12 @@ export function Home() {
   const [selectedFoodId, setSelectedFoodId] = useState<string | null>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
 
-  const {
-    cart,
-    removeFromCart,
-    updateCartItem,
-    isLoading: cartLoading,
-    getTotalItems,
-    getTotalPrice,
-  } = useCart();
+  const { cart, removeFromCart, updateCartItem, isLoading: cartLoading, getTotalItems, getTotalPrice } = useCart();
   const { isLoggedIn } = useAuth();
   const navigate = useNavigate();
   const [canRunDeliveries, setCanRunDeliveries] = useState(false);
   const [isRunnerOnline, setIsRunnerOnline] = useState(false);
-
-  // Close drawer on outside click
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (drawerRef.current && !drawerRef.current.contains(e.target as Node)) {
-        setCartOpen(false);
-      }
-    }
-    if (cartOpen) document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [cartOpen]);
-
-  // Prevent body scroll when drawer is open
-  useEffect(() => {
-    document.body.style.overflow = cartOpen ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
-  }, [cartOpen]);
+  const [playPop] = useSound("/notification.mp3", { volume: 0.4 });
 
   useEffect(() => {
     fetchMenuItems();
@@ -364,14 +344,7 @@ export function Home() {
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="bg-white rounded-xl overflow-hidden shadow-sm animate-pulse">
-              <div className="h-48 bg-gray-200" />
-              <div className="p-4 space-y-2">
-                <div className="h-4 bg-gray-200 rounded w-3/4" />
-                <div className="h-3 bg-gray-200 rounded w-full" />
-                <div className="h-3 bg-gray-200 rounded w-2/3" />
-              </div>
-            </div>
+            <FoodCardSkeleton key={i} />
           ))}
         </div>
       ) : (
@@ -395,7 +368,14 @@ export function Home() {
           >
             {filteredItems.map((item) => (
               <motion.div key={item.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                <FoodCard item={item} onAddSuccess={() => setCartOpen(true)} onOpenDetail={(id) => setSelectedFoodId(String(id))} />
+                <FoodCard 
+                  item={item} 
+                  onAddSuccess={() => {
+                    playPop();
+                    setCartOpen(true);
+                  }} 
+                  onOpenDetail={(id) => setSelectedFoodId(String(id))} 
+                />
               </motion.div>
             ))}
           </motion.div>
@@ -413,142 +393,7 @@ export function Home() {
       <FoodDetailModal foodId={selectedFoodId} open={Boolean(selectedFoodId)} onClose={() => setSelectedFoodId(null)} />
 
       {/* ── Cart Drawer Overlay ──────────────────────────────────── */}
-      {cartOpen && (
-        <div className="fixed inset-0 z-50 flex">
-          {/* backdrop */}
-          <div className="flex-1 bg-black/40 backdrop-blur-sm" onClick={() => setCartOpen(false)} />
-
-          {/* drawer */}
-          <div
-            ref={drawerRef}
-            className="w-full max-w-md bg-white h-full flex flex-col shadow-2xl"
-            style={{ animation: "slideInRight 0.25s ease-out" }}
-          >
-            {/* header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b bg-orange-500 text-white">
-              <div className="flex items-center gap-3">
-                <ShoppingCart className="w-5 h-5" />
-                <h2 className="text-lg font-bold">Your Cart</h2>
-                {cartCount > 0 && (
-                  <span className="bg-white text-orange-500 text-xs font-bold rounded-full px-2 py-0.5">
-                    {cartCount}
-                  </span>
-                )}
-              </div>
-              <button
-                onClick={() => setCartOpen(false)}
-                className="p-1 hover:bg-white/20 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* body */}
-            <div className="flex-1 overflow-y-auto">
-              {!isLoggedIn ? (
-                <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-                  <ShoppingCart className="w-16 h-16 text-gray-200 mb-4" />
-                  <p className="text-gray-700 font-semibold text-lg mb-2">Login to view your cart</p>
-                  <p className="text-gray-400 text-sm mb-6">
-                    Sign in with your RVU email to start ordering
-                  </p>
-                  <button
-                    onClick={() => { setCartOpen(false); navigate("/login"); }}
-                    className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-medium transition-colors"
-                  >
-                    Go to Login
-                  </button>
-                </div>
-              ) : !cart || cart.items.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-                  <span className="text-6xl mb-4">🛒</span>
-                  <p className="text-gray-700 font-semibold text-lg mb-2">Your cart is empty</p>
-                  <p className="text-gray-400 text-sm mb-6">
-                    Add some delicious items from the menu!
-                  </p>
-                  <button
-                    onClick={() => setCartOpen(false)}
-                    className="border border-orange-500 text-orange-500 hover:bg-orange-50 px-6 py-2.5 rounded-xl font-medium transition-colors"
-                  >
-                    Browse Menu
-                  </button>
-                </div>
-              ) : (
-                <div className="divide-y">
-                  {cart.items.map((item) => (
-                    <div key={item.id} className="flex items-center gap-3 px-5 py-4">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-gray-900 truncate">{item.food_name}</p>
-                        <p className="text-sm text-gray-500 mt-0.5">₹{item.price.toFixed(0)} each</p>
-                      </div>
-                      <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-2 py-1">
-                        <button
-                          onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
-                          disabled={cartLoading}
-                          className="p-0.5 hover:bg-gray-200 rounded disabled:opacity-40 transition-colors"
-                        >
-                          <Minus className="w-3.5 h-3.5 text-gray-700" />
-                        </button>
-                        <span className="w-6 text-center text-sm font-bold text-gray-800">
-                          {item.quantity}
-                        </span>
-                        <button
-                          onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                          disabled={cartLoading}
-                          className="p-0.5 hover:bg-gray-200 rounded disabled:opacity-40 transition-colors"
-                        >
-                          <Plus className="w-3.5 h-3.5 text-gray-700" />
-                        </button>
-                      </div>
-                      <div className="text-right min-w-[56px]">
-                        <p className="font-bold text-gray-900 text-sm">₹{item.total.toFixed(0)}</p>
-                      </div>
-                      <button
-                        onClick={() => removeFromCart(item.id)}
-                        disabled={cartLoading}
-                        className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* footer — only show if logged in and cart has items */}
-            {isLoggedIn && cart && cart.items.length > 0 && (
-              <div className="border-t bg-gray-50 px-5 py-5 space-y-3">
-                <div className="flex justify-between text-sm text-gray-600">
-                  <span>Subtotal</span>
-                  <span>₹{cartTotal.toFixed(0)}</span>
-                </div>
-                <div className="flex justify-between text-sm text-gray-600">
-                  <span>Delivery fee</span>
-                  <span>₹10</span>
-                </div>
-                <div className="flex justify-between font-bold text-gray-900 text-base border-t pt-3">
-                  <span>Total</span>
-                  <span>₹{(cartTotal + 10).toFixed(0)}</span>
-                </div>
-                <button
-                  onClick={handleCheckout}
-                  className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-md shadow-orange-200"
-                >
-                  Proceed to Checkout
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => { setCartOpen(false); navigate("/cart"); }}
-                  className="w-full text-orange-500 hover:text-orange-600 text-sm font-medium py-1 transition-colors"
-                >
-                  View full cart →
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <CartDrawer isOpen={cartOpen} onClose={() => setCartOpen(false)} />
 
       {/* ── Deliveries Modal ────────────────────────────────────── */}
       {showDeliveries && (

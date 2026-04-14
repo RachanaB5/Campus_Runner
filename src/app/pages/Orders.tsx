@@ -4,12 +4,18 @@ import { Link } from "react-router";
 import { api } from "../services/api";
 import { RateOrderSheet } from "../components/RateOrderSheet";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
+import { useCart } from "../context/CartContext";
+import { useNavigate } from "react-router";
+import { toast } from "sonner";
 
 export function Orders() {
   const [orders, setOrders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [ratingOrderId, setRatingOrderId] = useState<string | null>(null);
+  const [isReordering, setIsReordering] = useState<string | null>(null);
+  const { clearCart, addToCart } = useCart();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchMyOrders();
@@ -75,6 +81,22 @@ export function Orders() {
       delivered: { text: "Delivered", color: "bg-green-100 text-green-800" },
     };
     return statusMap[status] || { text: "Processing", color: "bg-gray-100 text-gray-800" };
+  };
+
+  const handleReorder = async (order: any) => {
+    try {
+      setIsReordering(order.id);
+      await clearCart();
+      for (const item of order.items) {
+        await addToCart(item.food_id, item.quantity);
+      }
+      toast.success("Added to cart! Ready for checkout.");
+      navigate("/checkout");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to reorder items");
+      setIsReordering(null);
+    }
   };
 
   return (
@@ -236,9 +258,18 @@ export function Orders() {
 
                     {/* Actions */}
                     <div className="flex gap-3">
-                      <Link to={`/orders/${order.id}/track`} className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg transition-colors font-medium text-center">
-                        Track Order
-                      </Link>
+                      {order.status !== "delivered" && (
+                        <Link to={`/orders/${order.id}/track`} className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg transition-colors font-medium text-center">
+                          Track
+                        </Link>
+                      )}
+                      <button 
+                        onClick={() => handleReorder(order)}
+                        disabled={isReordering === order.id}
+                        className="flex-1 bg-orange-100 hover:bg-orange-200 text-orange-700 py-2 rounded-lg transition-colors font-medium disabled:opacity-50"
+                      >
+                        {isReordering === order.id ? "Adding..." : "Reorder"}
+                      </button>
                       <button className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded-lg transition-colors font-medium">
                         Help
                       </button>

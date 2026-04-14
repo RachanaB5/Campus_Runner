@@ -464,3 +464,42 @@ def update_notification_preferences():
 def logout():
     """Logout a user"""
     return jsonify({'message': 'Logout successful'}), 200
+
+
+# ---------------------------------------------------------------------------
+# DEV-ONLY: expose in-memory OTP store for testing (never ship to production)
+# Activate by running Flask in debug mode OR setting DEV_OTP_ENDPOINT=1
+# ---------------------------------------------------------------------------
+@auth_bp.route('/dev/otp', methods=['GET'])
+def dev_get_otp():
+    """Return the current OTP store for a given email (dev/debug only)."""
+    is_debug = getattr(current_app, 'debug', False)
+    allowed = is_debug or os.environ.get('DEV_OTP_ENDPOINT', '').lower() in ('1', 'true', 'yes')
+    if not allowed:
+        return jsonify({'error': 'Not available in production'}), 403
+
+    email = normalize_email(request.args.get('email', ''))
+    now = datetime.utcnow()
+
+    if email:
+        record = otp_store.get(email)
+        if not record:
+            return jsonify({'error': 'No OTP found for that email'}), 404
+        return jsonify({
+            'email': email,
+            'otp': record['otp'],
+            'purpose': record.get('purpose'),
+            'expires_at': record['expires_at'].isoformat(),
+            'expired': now > record['expires_at'],
+        }), 200
+
+    # No email → return all active OTPs (useful during local dev)
+    result = {}
+    for addr, rec in otp_store.items():
+        result[addr] = {
+            'otp': rec['otp'],
+            'purpose': rec.get('purpose'),
+            'expires_at': rec['expires_at'].isoformat(),
+            'expired': now > rec['expires_at'],
+        }
+    return jsonify({'otps': result, 'count': len(result)}), 200

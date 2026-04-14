@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router";
-import { ShoppingCart, User, Award, Bike, Home, Clock, LogIn, Settings, LayoutDashboard } from "lucide-react";
+import { ShoppingCart, User, Award, Bike, Home, Clock, LogIn, Settings, LayoutDashboard, Moon, Sun } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import { useEffect, useState } from "react";
@@ -8,6 +8,9 @@ import { NotificationBell } from "./NotificationBell";
 import { RunnerActiveDeliveryPanel } from "./RunnerActiveDeliveryPanel";
 import { useRunnerState } from "../hooks/useRunnerState";
 import { motion } from "motion/react";
+import { useTheme } from "next-themes";
+import useSound from "use-sound";
+import { toast } from "sonner";
 
 export function Header() {
   const location = useLocation();
@@ -17,6 +20,8 @@ export function Header() {
   const [isTogglingRunner, setIsTogglingRunner] = useState(false);
   const [activeDelivery, setActiveDelivery] = useState<any | null>(null);
   const [showDeliveryPanel, setShowDeliveryPanel] = useState(false);
+  const { theme, setTheme } = useTheme();
+  const [playChime] = useSound('/notification.mp3', { volume: 0.5 });
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -35,7 +40,15 @@ export function Header() {
       try {
         const response = await api.getRunnerActiveDelivery();
         if (!isMounted) return;
-        setActiveDelivery(response.active ? response : null);
+        
+        setActiveDelivery((prev) => {
+          if (!prev && response.active) {
+            playChime();
+            toast.info("Active Delivery details updated!");
+          }
+          return response.active ? response : null;
+        });
+
         if (response.active && localStorage.getItem("runner-open-delivery")) {
           setShowDeliveryPanel(true);
         }
@@ -77,21 +90,15 @@ export function Header() {
   const handleRunnerToggle = async () => {
     try {
       setIsTogglingRunner(true);
-      if (!runner.isRunner) {
-        await api.registerAsRunner({
-          vehicle_type: "bike",
-          license_number: `DL-${Date.now()}`,
-        });
-      }
       const nextAvailability = await runner.toggle();
-      alert(
-        nextAvailability
-          ? "You are now available for deliveries"
-          : "You are now unavailable"
-      );
+      if (nextAvailability) {
+        toast.success("You are now online and available for deliveries");
+      } else {
+        toast.info("You are now offline");
+      }
     } catch (error: any) {
       console.error("Error toggling runner mode:", error);
-      alert(error.message || "Failed to toggle runner mode. Please try again.");
+      toast.error(error.message || "Failed to toggle runner mode. Please try again.");
     } finally {
       setIsTogglingRunner(false);
     }
@@ -128,22 +135,24 @@ export function Header() {
             </Link>
             {isLoggedIn && (
               <>
-                <button
-                  onClick={handleRunnerToggle}
-                  disabled={isTogglingRunner}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                    runner.isAvailable
-                      ? 'bg-orange-50 text-orange-600'
-                      : 'text-gray-600 hover:text-orange-600'
-                  } disabled:opacity-50`}
-                  title={runner.isAvailable ? "Runner Mode Active" : "Click to Enable Runner Mode"}
-                >
-                  <Bike className="w-5 h-5" />
-                  <span>Runner Mode</span>
-                  {runner.isAvailable && (
-                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                  )}
-                </button>
+                {runner.isRunner && (
+                  <button
+                    onClick={handleRunnerToggle}
+                    disabled={isTogglingRunner}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                      runner.isAvailable
+                        ? 'bg-orange-50 text-orange-600'
+                        : 'text-gray-600 hover:text-orange-600'
+                    } disabled:opacity-50`}
+                    title={runner.isAvailable ? "Runner Mode Active" : "Click to Enable Runner Mode"}
+                  >
+                    <Bike className="w-5 h-5" />
+                    <span>Runner Mode</span>
+                    {runner.isAvailable && (
+                      <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                    )}
+                  </button>
+                )}
                 {runner.isRunner && (
                   <Link
                     to="/runner"
@@ -200,6 +209,17 @@ export function Header() {
           </nav>
 
           <div className="flex items-center gap-4">
+            <button
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              {theme === "dark" ? (
+                <Sun className="w-5 h-5 text-gray-700" />
+              ) : (
+                <Moon className="w-5 h-5 text-gray-700" />
+              )}
+            </button>
+
             {isLoggedIn ? (
               <>
                 <NotificationBell />
@@ -246,19 +266,21 @@ export function Header() {
           </Link>
           {isLoggedIn && (
             <>
-              <button
-                onClick={handleRunnerToggle}
-                disabled={isTogglingRunner}
-                className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg ${
-                  runner.isAvailable ? 'text-orange-600' : 'text-gray-600'
-                } disabled:opacity-50`}
-              >
-                <Bike className="w-5 h-5" />
-                <span className="text-xs">Runner</span>
-                {runner.isAvailable && (
-                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                )}
-              </button>
+              {runner.isRunner && (
+                <button
+                  onClick={handleRunnerToggle}
+                  disabled={isTogglingRunner}
+                  className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg ${
+                    runner.isAvailable ? 'text-orange-600' : 'text-gray-600'
+                  } disabled:opacity-50`}
+                >
+                  <Bike className="w-5 h-5" />
+                  <span className="text-xs">Runner</span>
+                  {runner.isAvailable && (
+                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                  )}
+                </button>
+              )}
               {runner.isRunner && (
                 <Link 
                   to="/runner" 

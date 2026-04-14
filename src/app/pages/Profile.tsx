@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { api, API_BASE_URL, getToken } from "../services/api";
 import { useNavigate } from "react-router";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
+import { toast } from "sonner";
 
 const defaultPreferences = {
   order_updates: true,
@@ -183,6 +184,35 @@ export function Profile() {
       </div>
 
       <div className="space-y-4">
+        {user?.role !== "RUNNER" && user?.role !== "runner" && (
+          <section className="bg-gradient-to-r from-orange-500 to-red-500 rounded-xl shadow-md p-6 text-white mb-6">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-bold flex items-center gap-2">
+                  <Bike className="w-6 h-6" /> Become a Delivery Runner!
+                </h3>
+                <p className="mt-1 text-orange-100 max-w-sm">
+                  Earn points, get free meals, and help your campus community by delivering food.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await api.registerAsRunner({ vehicle_type: 'bicycle', license_number: 'N/A' });
+                    toast.success("Welcome aboard! Refresh the page to access Runner Mode.");
+                    setTimeout(() => window.location.reload(), 1500);
+                  } catch (err: any) {
+                    toast.error(err.message || "Failed to upgrade account.");
+                  }
+                }}
+                className="bg-white text-orange-600 px-6 py-3 rounded-lg font-bold shadow hover:bg-orange-50 transition-colors shrink-0"
+              >
+                Join Now
+              </button>
+            </div>
+          </section>
+        )}
         <section className="bg-white rounded-xl shadow-md p-6">
           <button type="button" onClick={() => setEditOpen((value) => !value)} className="w-full flex items-center justify-between text-left">
             <span className="text-xl text-gray-900">Edit Profile</span>

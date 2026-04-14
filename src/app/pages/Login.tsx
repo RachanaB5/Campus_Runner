@@ -15,6 +15,7 @@ export function Login() {
   const [phone, setPhone] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [banner, setBanner] = useState("");
+  const [isRunner, setIsRunner] = useState(false);
 
   useEffect(() => {
     if (searchParams.get("reset") === "1") {
@@ -54,7 +55,7 @@ export function Login() {
           setIsLoading(false);
           return;
         }
-        const reg = await register(name.trim(), normalizedEmail, password, phone.trim());
+        const reg = await register(name.trim(), normalizedEmail, password, phone.trim(), isRunner);
         if (reg.requires_verification) {
           const devOtp = reg.dev_otp;
           navigate(`/verify-email?email=${encodeURIComponent(normalizedEmail)}`, {
@@ -151,6 +152,24 @@ export function Login() {
                   placeholder="Enter your phone number"
                   className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 />
+              </div>
+            )}
+
+            {!isLogin && (
+              <div className="flex items-start gap-3 mt-4 p-4 bg-orange-50/50 border border-orange-100 rounded-lg">
+                <input
+                  type="checkbox"
+                  id="isRunner"
+                  checked={isRunner}
+                  onChange={(e) => setIsRunner(e.target.checked)}
+                  className="mt-1 w-4 h-4 text-orange-500 bg-white rounded border-gray-300 focus:ring-orange-500"
+                />
+                <div className="flex flex-col">
+                  <label htmlFor="isRunner" className="text-sm text-gray-900 font-medium cursor-pointer">
+                    Sign up as a Delivery Runner
+                  </label>
+                  <span className="text-xs text-gray-500">Deliver food on campus and earn points!</span>
+                </div>
               </div>
             )}
 

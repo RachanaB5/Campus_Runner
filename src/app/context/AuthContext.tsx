@@ -27,7 +27,7 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string, phone?: string) => Promise<{
+  register: (name: string, email: string, password: string, phone?: string, isRunner?: boolean) => Promise<{
     requires_verification?: boolean;
     access_token?: string;
     user?: User;
@@ -78,8 +78,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const register = async (name: string, email: string, password: string, phone?: string) => {
-    const data = await authAPI.register({ name, email, password, phone });
+  const register = async (name: string, email: string, password: string, phone?: string, isRunner?: boolean) => {
+    const data = await authAPI.register({ name, email, password, phone, role: isRunner ? 'RUNNER' : 'STUDENT' });
     if (data.access_token) {
       setToken(data.access_token);
       setUser(data.user);

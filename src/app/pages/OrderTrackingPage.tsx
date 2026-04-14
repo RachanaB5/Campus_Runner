@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { PhoneCall } from "lucide-react";
+import confetti from "canvas-confetti";
 import { useOrderTracking } from "../hooks/useOrderTracking";
 import { RateOrderSheet } from "../components/RateOrderSheet";
 
@@ -23,6 +24,23 @@ export function OrderTrackingPage() {
   }, [location.state]);
   const tracking = useOrderTracking(id, initialTracking);
   const [ratingOpen, setRatingOpen] = useState(false);
+
+  useEffect(() => {
+    // If we have items in state, we just arrived from checkout
+    if (location.state?.items) {
+      setTimeout(() => {
+        confetti({
+          particleCount: 150,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#f97316', '#3b82f6', '#10b981', '#fcd34d']
+        });
+      }, 300);
+      
+      // Replace state to avoid re-triggering on refresh
+      navigate(".", { replace: true, state: {} });
+    }
+  }, [location.state, navigate]);
 
   if (!tracking) {
     return <div className="max-w-4xl mx-auto px-4 py-12 text-gray-500">Loading order tracking...</div>;
