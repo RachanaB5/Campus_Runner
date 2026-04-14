@@ -7,6 +7,7 @@ import { api } from "../services/api";
 import { NotificationBell } from "./NotificationBell";
 import { RunnerActiveDeliveryPanel } from "./RunnerActiveDeliveryPanel";
 import { useRunnerState } from "../hooks/useRunnerState";
+import { motion } from "motion/react";
 
 export function Header() {
   const location = useLocation();
@@ -97,7 +98,12 @@ export function Header() {
   };
 
   return (
-    <header className="bg-white shadow-sm sticky top-0 z-50">
+    <motion.header 
+      initial={{ y: -20, opacity: 0 }} 
+      animate={{ y: 0, opacity: 1 }} 
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-50 border-b border-gray-100"
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <Link to="/" className="flex items-center gap-2">
@@ -325,6 +331,6 @@ export function Header() {
           }
         }}
       />
-    </header>
+    </motion.header>
   );
 }

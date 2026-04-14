@@ -7,6 +7,7 @@ import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router";
 import * as api from "../services/api";
+import { motion, AnimatePresence } from "motion/react";
 
 interface Food {
   id: string;
@@ -264,10 +265,15 @@ export function Home() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       {/* ── Hero Banner ─────────────────────────────────────────── */}
-      <div
-        className="relative rounded-2xl overflow-hidden mb-8"
+      <motion.div
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className="relative rounded-2xl overflow-hidden mb-8 shadow-xl"
         style={{
-          background: "linear-gradient(135deg, #ff6b35 0%, #f7931e 50%, #ffcd3c 100%)",
+          background: "linear-gradient(270deg, #ff6b35, #f7931e, #ffcd3c, #ff6b35)",
+          backgroundSize: "400% 400%",
+          animation: "gradientFlow 15s ease infinite",
         }}
       >
         <div className="relative z-10 p-8 text-white">
@@ -275,17 +281,17 @@ export function Home() {
             <p className="text-sm font-semibold uppercase tracking-widest opacity-80 mb-2">
               RV University Canteen
             </p>
-            <h2 className="text-3xl md:text-4xl font-bold mb-3 leading-tight">
+            <h2 className="text-3xl md:text-4xl font-bold mb-3 leading-tight drop-shadow-sm">
               Order Fresh, Earn Points 🎉
             </h2>
-            <p className="text-base opacity-90 mb-6">
+            <p className="text-base opacity-90 mb-6 drop-shadow-sm">
               From Biryani to Maggi — everything you love, delivered on campus
             </p>
             <div className="flex flex-wrap gap-3">
               {["⚡ 10 min pickup", "🌿 Fresh daily", "🏆 Earn rewards"].map((t) => (
                 <span
                   key={t}
-                  className="bg-white/20 backdrop-blur-sm rounded-full px-4 py-1.5 text-sm font-medium"
+                  className="bg-white/20 backdrop-blur-md rounded-full px-4 py-1.5 text-sm font-medium border border-white/30 shadow-sm"
                 >
                   {t}
                 </span>
@@ -294,9 +300,9 @@ export function Home() {
           </div>
         </div>
         {/* decorative circles */}
-        <div className="absolute -right-10 -top-10 w-56 h-56 rounded-full bg-white/10" />
-        <div className="absolute -right-4 bottom-0 w-32 h-32 rounded-full bg-white/10" />
-      </div>
+        <div className="absolute -right-10 -top-10 w-56 h-56 rounded-full bg-white/10 blur-xl" />
+        <div className="absolute -right-4 bottom-0 w-32 h-32 rounded-full bg-white/10 blur-xl" />
+      </motion.div>
 
       {/* ── Search + Cart Button Row ─────────────────────────────── */}
       <div className="flex gap-3 mb-6">
@@ -334,21 +340,22 @@ export function Home() {
       </div>
 
       {/* ── Category Chips ───────────────────────────────────────── */}
-      <div className="mb-8 overflow-x-auto scrollbar-hide">
+      <div className="mb-8 overflow-x-auto scrollbar-hide py-1">
         <div className="flex gap-2 pb-2">
           {CATEGORIES.map(({ label, emoji }) => (
-            <button
+            <motion.button
+              whileTap={{ scale: 0.95 }}
               key={label}
               onClick={() => setSelectedCategory(label)}
-              className={`px-4 py-2 rounded-full whitespace-nowrap text-sm font-medium transition-all flex items-center gap-1.5 ${
+              className={`px-4 py-2 rounded-full whitespace-nowrap text-sm font-medium transition-colors flex items-center gap-1.5 ${
                 selectedCategory === label
                   ? "bg-orange-500 text-white shadow-md shadow-orange-200"
-                  : "bg-white text-gray-700 hover:bg-orange-50 hover:text-orange-600 border border-gray-200"
+                  : "bg-white text-gray-700 hover:bg-orange-50 hover:text-orange-600 border border-gray-100 shadow-sm"
               }`}
             >
               <span>{emoji}</span>
               {label}
-            </button>
+            </motion.button>
           ))}
         </div>
       </div>
@@ -380,11 +387,18 @@ export function Home() {
               </span>
             </div>
           )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ staggerChildren: 0.05 }}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+          >
             {filteredItems.map((item) => (
-              <FoodCard key={item.id} item={item} onAddSuccess={() => setCartOpen(true)} onOpenDetail={(id) => setSelectedFoodId(String(id))} />
+              <motion.div key={item.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                <FoodCard item={item} onAddSuccess={() => setCartOpen(true)} onOpenDetail={(id) => setSelectedFoodId(String(id))} />
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
           {filteredItems.length === 0 && (
             <div className="text-center py-20">
               <p className="text-5xl mb-4">🔍</p>
@@ -634,6 +648,11 @@ export function Home() {
         @keyframes slideInRight {
           from { transform: translateX(100%); opacity: 0; }
           to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes gradientFlow {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
         }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }

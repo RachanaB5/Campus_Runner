@@ -87,10 +87,90 @@ def _get_otp_theme(value):
         return OTP_EMAIL_THEMES.get(_normalize_otp_theme_key(value), OTP_EMAIL_THEMES['profile_signup'])
 
 
+def _brand_support_email(app=None):
+        if app is not None:
+                configured = (app.config.get('MAIL_SUPPORT_EMAIL') or '').strip()
+                if configured:
+                        return configured
+                sender = (
+                        (app.config.get('MAIL_USERNAME') or '').strip()
+                        or (app.config.get('MAIL_DEFAULT_SENDER') or '').strip()
+                )
+                if sender:
+                        return sender
+        return (
+                os.getenv('MAIL_SUPPORT_EMAIL', '').strip()
+                or os.getenv('MAIL_USERNAME', '').strip()
+                or os.getenv('EMAIL_ADDRESS', '').strip()
+                or 'support@campusrunner.com'
+        )
+
+
+def _brand_logo_url(app=None):
+        if app is not None:
+                configured = (
+                        app.config.get('MAIL_LOGO_URL')
+                        or app.config.get('BRAND_LOGO_URL')
+                        or app.config.get('APP_LOGO_URL')
+                        or ''
+                )
+                configured = str(configured).strip()
+                if configured:
+                        return configured
+        return (
+                os.getenv('MAIL_LOGO_URL', '').strip()
+                or os.getenv('BRAND_LOGO_URL', '').strip()
+                or os.getenv('APP_LOGO_URL', '').strip()
+        )
+
+
+def _render_email_brand_header(app=None):
+        logo_url = _brand_logo_url(app)
+        if logo_url:
+                safe_url = escape(logo_url, quote=True)
+                return f'''
+                                <tr>
+                                    <td style="padding: 22px 28px; border-bottom: 1px solid #e6ebf1; background: #ffffff;">
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse: collapse;">
+                                            <tr>
+                                                <td style="vertical-align: middle; width: 56px;">
+                                                    <img src="{safe_url}" alt="Campus Runner" style="width: 44px; height: 44px; border-radius: 10px; display: block;" />
+                                                </td>
+                                                <td style="vertical-align: middle;">
+                                                    <div style="font-size: 24px; font-weight: 800; color: #111827; line-height: 1.1;">CampusRunner</div>
+                                                    <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Campus food ordering and delivery</div>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                '''
+
+        return '''
+                                <tr>
+                                    <td style="padding: 22px 28px; border-bottom: 1px solid #e6ebf1; background: #ffffff;">
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse: collapse;">
+                                            <tr>
+                                                <td style="vertical-align: middle; width: 56px;">
+                                                    <div style="width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg, #ea580c 0%, #f97316 100%); color: #ffffff; text-align: center; line-height: 44px; font-size: 18px; font-weight: 800;">CR</div>
+                                                </td>
+                                                <td style="vertical-align: middle;">
+                                                    <div style="font-size: 24px; font-weight: 800; color: #111827; line-height: 1.1;">CampusRunner</div>
+                                                    <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Campus food ordering and delivery</div>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+        '''
+
+
 def build_otp_email_html(otp, purpose, recipient_name=None, extra_details=None):
         theme = _get_otp_theme(purpose)
         safe_name = escape((recipient_name or 'Customer').strip())
         safe_otp = escape(str(otp))
+        support_email = escape(_brand_support_email())
+        brand_header = _render_email_brand_header()
         action_message = {
                 'profile_signup': 'verify your email address',
                 'profile_password_reset': 'reset your password',
@@ -131,11 +211,7 @@ def build_otp_email_html(otp, purpose, recipient_name=None, extra_details=None):
                     <tr>
                         <td align="center">
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; background: #ffffff; border: 1px solid #e6ebf1;">
-                                <tr>
-                                    <td style="padding: 24px 36px; border-bottom: 1px solid #e6ebf1;">
-                                        <div style="font-size: 24px; font-weight: 700; color: #111827;">Campus Runner</div>
-                                    </td>
-                                </tr>
+                                {brand_header}
                                 <tr>
                                     <td style="padding: 28px 36px;">
                                         <div style="font-size: 25px; font-weight: 600; color: #111827; margin-bottom: 16px;">{escape(theme['title'])}</div>
@@ -171,7 +247,7 @@ def build_otp_email_html(otp, purpose, recipient_name=None, extra_details=None):
                                 </tr>
                                 <tr>
                                     <td style="padding: 22px 36px; border-top: 1px solid #e6ebf1;">
-                                        <div style="font-size: 12px; line-height: 1.6; color: #8898aa;">Need help? Contact support@campusrunner.com</div>
+                                        <div style="font-size: 12px; line-height: 1.6; color: #8898aa;">Need help? Contact {support_email}</div>
                                         <div style="font-size: 12px; line-height: 1.6; color: #8898aa;">&copy; {datetime.now().year} Campus Runner. All rights reserved.</div>
                                     </td>
                                 </tr>
@@ -286,6 +362,8 @@ def send_email_in_background(app, subject, recipients, html):
 
 
 def build_order_confirmation_email_html(user_name, order_number, order_details, total_amount, estimated_delivery_time, otp_details=None):
+    support_email = escape(_brand_support_email())
+    brand_header = _render_email_brand_header()
     items_html = ""
     for item in order_details.get('items', []):
         items_html += f"""
@@ -331,11 +409,7 @@ def build_order_confirmation_email_html(user_name, order_number, order_details, 
           <tr>
             <td align="center">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 620px; background:#ffffff; border: 1px solid #e6ebf1;">
-                <tr>
-                  <td style="padding: 22px 32px; border-bottom: 1px solid #e6ebf1;">
-                    <div style="font-size: 24px; font-weight: 700; color: #111827;">Campus Runner</div>
-                  </td>
-                </tr>
+                                {brand_header}
 
                 <tr>
                   <td style="padding: 24px 32px; background: #f0fdf4; text-align: center;">
@@ -386,7 +460,7 @@ def build_order_confirmation_email_html(user_name, order_number, order_details, 
 
                 <tr>
                   <td style="padding: 22px 32px; border-top: 1px solid #e6ebf1;">
-                    <div style="font-size: 12px; color:#8898aa; line-height: 1.6;">Questions about your order? Contact support@campusrunner.com</div>
+                                        <div style="font-size: 12px; color:#8898aa; line-height: 1.6;">Questions about your order? Contact {support_email}</div>
                     <div style="font-size: 12px; color:#8898aa; line-height: 1.6;">&copy; {datetime.now().year} Campus Runner. All rights reserved.</div>
                   </td>
                 </tr>
@@ -505,6 +579,8 @@ def send_order_ready_notification(user_email, user_name, order_number, app=None)
             
         safe_name = escape((user_name or 'there').strip())
         safe_order = escape(str(order_number))
+        support_email = escape(_brand_support_email(app))
+        brand_header = _render_email_brand_header(app)
         
         subject = f"Your Order #{order_number} is Ready! - Campus Runner"
         
@@ -518,6 +594,7 @@ def send_order_ready_notification(user_email, user_name, order_number, app=None)
                     <tr>
                         <td align="center">
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 680px; background: #ffffff; border-radius: 28px; overflow: hidden; box-shadow: 0 18px 48px rgba(15, 23, 42, 0.12); border: 1px solid rgba(15, 23, 42, 0.06);">
+                                {brand_header}
                                 <tr>
                                     <td style="background: linear-gradient(135deg, #16A34A 0%, #15803D 100%); padding: 28px 32px; color:#ffffff;">
                                         <div style="font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.9; margin-bottom: 10px;">Great News!</div>
@@ -567,7 +644,7 @@ def send_order_ready_notification(user_email, user_name, order_number, app=None)
                                         </table>
 
                                         <div style="margin-top: 20px; font-size: 13px; line-height: 1.7; color:#64748b;">
-                                            Questions? Contact our support team directly from the app. We're here to help!
+                                            Questions? Contact our support team at {support_email}. We're here to help!
                                         </div>
                                     </td>
                                 </tr>
@@ -601,6 +678,8 @@ def send_welcome_email(user_email, user_name, app=None):
             app = flask_app
         
         safe_name = escape((user_name or 'Customer').strip())
+        support_email = escape(_brand_support_email(app))
+        brand_header = _render_email_brand_header(app)
         
         html = f"""
         <html>
@@ -609,11 +688,7 @@ def send_welcome_email(user_email, user_name, app=None):
                     <tr>
                         <td align="center">
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; background: #ffffff; border: 1px solid #e6ebf1;">
-                                <tr>
-                                    <td style="padding: 24px 36px; border-bottom: 1px solid #e6ebf1;">
-                                        <div style="font-size: 24px; font-weight: 700; color: #111827;">Campus Runner</div>
-                                    </td>
-                                </tr>
+                                {brand_header}
 
                                 <tr>
                                     <td style="background: #1a1a1a; padding: 40px 36px; text-align: center;">
@@ -633,7 +708,7 @@ def send_welcome_email(user_email, user_name, app=None):
                                             <tr><td style="padding: 14px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;"><strong style="color:#111827;">Rewards</strong><div style="margin-top:6px; color:#6b7280; font-size:14px;">Collect points and unlock special offers.</div></td></tr>
                                         </table>
 
-                                        <div style="font-size: 14px; color:#6b7280; line-height: 1.7;">Need help? Contact support@campusrunner.com anytime.</div>
+                                        <div style="font-size: 14px; color:#6b7280; line-height: 1.7;">Need help? Contact {support_email} anytime.</div>
                                     </td>
                                 </tr>
 
@@ -1092,6 +1167,8 @@ def send_runner_otp_notification(runner_email, runner_name, order_number, pickup
         safe_order = escape(str(order_number))
         safe_pickup = escape(str(pickup_location or 'Canteen'))
         safe_delivery = escape(str(delivery_address or 'Delivery Address'))
+        support_email = escape(_brand_support_email(app))
+        brand_header = _render_email_brand_header(app)
         
         html = f"""
         <html>
@@ -1100,6 +1177,7 @@ def send_runner_otp_notification(runner_email, runner_name, order_number, pickup
                     <tr>
                         <td align="center">
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 680px; background: #ffffff; border-radius: 28px; overflow: hidden; box-shadow: 0 18px 48px rgba(15, 23, 42, 0.12); border: 1px solid rgba(15, 23, 42, 0.06);">
+                                {brand_header}
                                 <tr>
                                     <td style="background: linear-gradient(135deg, #0EA5A4 0%, #0891B2 100%); padding: 28px 32px; color:#ffffff;">
                                         <div style="font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.9; margin-bottom: 10px;">Order Pickup Assignment</div>
@@ -1148,7 +1226,7 @@ def send_runner_otp_notification(runner_email, runner_name, order_number, pickup
                                         </table>
 
                                         <div style="margin-top: 20px; font-size: 13px; line-height: 1.7; color:#64748b;">
-                                            Track this order in your runner dashboard. Questions? Contact support immediately.
+                                            Track this order in your runner dashboard. Questions? Contact support at {support_email}.
                                         </div>
                                     </td>
                                 </tr>
