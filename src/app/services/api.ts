@@ -1,4 +1,15 @@
-const API_BASE_URL = 'http://localhost:5000/api';
+const rawApiBaseUrl = (import.meta as ImportMeta & {
+  env?: Record<string, string | undefined>;
+}).env?.VITE_API_BASE_URL;
+
+const API_BASE_URL = (rawApiBaseUrl?.trim() || 'http://localhost:5000/api').replace(/\/$/, '');
+
+const retryAttempts = Number(
+  (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env
+    ?.VITE_API_RETRY_ATTEMPTS ?? 2,
+);
+
+const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
 
 // Export API_BASE_URL for use in other services
 export { API_BASE_URL };
@@ -11,11 +22,13 @@ export const getToken = () => {
 // Helper function to set token
 export const setToken = (token: string) => {
   localStorage.setItem('access_token', token);
+  window.dispatchEvent(new Event('auth:token-changed'));
 };
 
 // Helper function to remove token
 export const removeToken = () => {
   localStorage.removeItem('access_token');
+  window.dispatchEvent(new Event('auth:token-changed'));
 };
 
 // Make API request with token
@@ -33,10 +46,37 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  const method = (options.method || 'GET').toUpperCase();
+  const isIdempotentMethod = method === 'GET' || method === 'HEAD' || method === 'OPTIONS';
+
+  let response: Response | undefined;
+  let networkError: unknown;
+
+  for (let attempt = 1; attempt <= Math.max(1, retryAttempts); attempt += 1) {
+    try {
+      response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        ...options,
+        headers,
+      });
+      networkError = undefined;
+
+      if (response.ok || !isIdempotentMethod || !RETRYABLE_STATUS_CODES.has(response.status) || attempt >= retryAttempts) {
+        break;
+      }
+    } catch (error) {
+      networkError = error;
+      if (!isIdempotentMethod || attempt >= retryAttempts) {
+        break;
+      }
+    }
+
+    const backoffMs = 150 * Math.pow(2, attempt - 1);
+    await new Promise((resolve) => window.setTimeout(resolve, backoffMs));
+  }
+
+  if (!response) {
+    throw networkError instanceof Error ? networkError : new Error('Network request failed');
+  }
 
   if (!response.ok) {
     if (response.status === 401 && !endpoint.startsWith('/auth/')) {

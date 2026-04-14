@@ -68,7 +68,11 @@ if 'MAIL_SUPPRESS_SEND' in os.environ:
 from models import db
 db.init_app(app)
 
-_ALLOWED_ORIGINS = [
+def _normalize_origin(origin: str) -> str:
+    return origin.strip().rstrip('/')
+
+
+_DEFAULT_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://localhost:5174",
     "http://localhost:3000",
@@ -80,12 +84,22 @@ _ALLOWED_ORIGINS = [
     "http://10.17.20.172:3000",
 ]
 
+
+_env_allowed_origins = [
+    _normalize_origin(origin)
+    for origin in os.getenv('CORS_ORIGINS', '').split(',')
+    if origin.strip()
+]
+
+_ALLOWED_ORIGINS = _env_allowed_origins or _DEFAULT_ALLOWED_ORIGINS
+_ALLOWED_ORIGIN_SET = set(_ALLOWED_ORIGINS)
+
 # Improved CORS configuration
 CORS(app, resources={
     r"/api/*": {
         "origins": _ALLOWED_ORIGINS,
         "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"],
+        "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
         "supports_credentials": True
     }
 })
@@ -122,11 +136,17 @@ except Exception as socket_error:
 @app.before_request
 def handle_preflight():
     if request.method == "OPTIONS":
+        origin = _normalize_origin(request.headers.get('Origin', ''))
+        if origin and origin not in _ALLOWED_ORIGIN_SET:
+            return jsonify({'error': 'Origin not allowed'}), 403
+
         response = jsonify({'success': True})
-        response.headers.add("Access-Control-Allow-Origin", request.headers.get('Origin', '*'))
-        response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization")
+        if origin:
+            response.headers.add("Access-Control-Allow-Origin", origin)
+            response.headers.add("Access-Control-Allow-Credentials", "true")
+
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization,X-Requested-With")
         response.headers.add("Access-Control-Allow-Methods", "GET,PUT,PATCH,POST,DELETE,OPTIONS")
-        response.headers.add("Access-Control-Allow-Credentials", "true")
         return response, 200
 
 # Initialize Flask-Mail

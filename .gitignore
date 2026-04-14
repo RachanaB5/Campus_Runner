@@ -27,6 +27,9 @@ node_modules/
 dist/
 coverage/
 
+# Docker
+.dockerignore
+
 # Generated files
 invoices/
 

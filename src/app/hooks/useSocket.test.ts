@@ -56,11 +56,12 @@ describe("useSocket", () => {
     expect(disconnectSocket).not.toHaveBeenCalled();
   });
 
-  it("returns existing socket from getSocket on initial render", () => {
+  it("disconnects stale socket when token is missing", () => {
     vi.mocked(getSocket).mockReturnValue(mockSocket);
     vi.mocked(getToken).mockReturnValue(null);
 
     const { result } = renderHook(() => useSocket(true));
-    expect(result.current).toBe(mockSocket);
+    expect(result.current).toBeNull();
+    expect(disconnectSocket).toHaveBeenCalledTimes(1);
   });
 });

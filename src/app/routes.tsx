@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router";
+import { createBrowserRouter, Navigate, Outlet, useLocation } from "react-router";
 import { Root } from "./components/Root";
 import { Home } from "./pages/Home";
 import { Login } from "./pages/Login";
@@ -14,6 +14,22 @@ import { Payment } from "./pages/Payment";
 import { Admin } from "./pages/Admin";
 import { OrderTrackingPage } from "./pages/OrderTrackingPage";
 import { RunnerDeliveryPage } from "./pages/RunnerDeliveryPage";
+import { useAuth } from "./context/AuthContext";
+
+function ProtectedRoute() {
+  const { isLoggedIn, isLoading } = useAuth();
+  const location = useLocation();
+
+  if (isLoading) {
+    return null;
+  }
+
+  if (!isLoggedIn) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  return <Outlet />;
+}
 
 export const router = createBrowserRouter([
   {
@@ -24,16 +40,21 @@ export const router = createBrowserRouter([
       { path: "login", Component: Login },
       { path: "verify-email", Component: VerifyEmail },
       { path: "forgot-password", Component: ForgotPassword },
-      { path: "cart", Component: Cart },
-      { path: "checkout", Component: Checkout },
-      { path: "runner", Component: RunnerMode },
-      { path: "runner/delivery/:deliveryId", Component: RunnerDeliveryPage },
-      { path: "rewards", Component: Rewards },
-      { path: "profile", Component: Profile },
-      { path: "orders", Component: Orders },
-      { path: "orders/:id/track", Component: OrderTrackingPage },
-      { path: "payment", Component: Payment },
-      { path: "admin", Component: Admin },
+      {
+        Component: ProtectedRoute,
+        children: [
+          { path: "cart", Component: Cart },
+          { path: "checkout", Component: Checkout },
+          { path: "runner", Component: RunnerMode },
+          { path: "runner/delivery/:deliveryId", Component: RunnerDeliveryPage },
+          { path: "rewards", Component: Rewards },
+          { path: "profile", Component: Profile },
+          { path: "orders", Component: Orders },
+          { path: "orders/:id/track", Component: OrderTrackingPage },
+          { path: "payment", Component: Payment },
+          { path: "admin", Component: Admin },
+        ],
+      },
     ],
   },
 ]);
