@@ -7,6 +7,8 @@ import uuid
 import re
 
 checkout_bp = Blueprint('checkout', __name__)
+MIN_DELIVERY_FEE = 10.0
+MAX_DELIVERY_FEE = 15.0
 
 
 def _parse_redeemed_voucher(transaction: RewardTransaction | None):
@@ -35,6 +37,23 @@ def _compute_voucher_discount(voucher, subtotal: float, delivery_fee: float) -> 
     if voucher['discount_type'] == 'delivery':
         return min(delivery_fee, float(voucher['discount_value']))
     return min(subtotal + delivery_fee, float(voucher['discount_value']))
+
+
+def _campus_delivery_fee(subtotal: float) -> float:
+    return MIN_DELIVERY_FEE if subtotal >= 500 else MAX_DELIVERY_FEE
+
+
+def _normalize_delivery_fee(value, subtotal: float) -> float:
+    try:
+        requested_fee = round(float(value), 2)
+    except (TypeError, ValueError):
+        return _campus_delivery_fee(subtotal)
+
+    if requested_fee < MIN_DELIVERY_FEE:
+        return MIN_DELIVERY_FEE
+    if requested_fee > MAX_DELIVERY_FEE:
+        return MAX_DELIVERY_FEE
+    return requested_fee
 
 def generate_order_number():
     """Generate unique order number"""
@@ -88,7 +107,7 @@ def validate_checkout():
             return jsonify({
                 'success': False,
                 'errors': {
-                    'phone': 'Please enter a valid phone number (10+ digits)'
+                    'phone': 'Please enter a valid 10-digit phone number'
                 },
                 'validation_status': checkout.to_dict()
             }), 400
@@ -213,7 +232,7 @@ def confirm_checkout():
             order_items.append(order_item)
         
         tax_amount = round(float(data.get('tax_amount', round(subtotal * 0.05, 2))), 2)
-        delivery_fee = round(float(data.get('delivery_fee', 0)), 2)
+        delivery_fee = _normalize_delivery_fee(data.get('delivery_fee'), subtotal)
         discount_amount = 0.0
         discount_code = None
         reward_code = str(data.get('reward_code') or '').strip()
@@ -388,7 +407,7 @@ def get_checkout_summary():
                 subtotal += float(food.price) * int(item.get('quantity', 1))
 
         tax_amount = round(subtotal * 0.05, 2)
-        delivery_fee = 50.0 if subtotal < 500 else 0.0
+        delivery_fee = _campus_delivery_fee(subtotal)
         final_total = round(subtotal + tax_amount + delivery_fee, 2)
 
         return jsonify({
