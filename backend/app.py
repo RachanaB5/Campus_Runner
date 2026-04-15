@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from flask_mail import Mail
@@ -26,6 +26,9 @@ if os.path.exists(backend_dotenv):
 
 # Create Flask app
 app = Flask(__name__)
+
+frontend_dist_dir = os.path.join(parent_dir, 'dist')
+frontend_index_file = os.path.join(frontend_dist_dir, 'index.html')
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -668,6 +671,9 @@ except Exception as init_error:
 
 @app.route('/', methods=['GET'])
 def root():
+    if os.path.exists(frontend_index_file):
+        return send_from_directory(frontend_dist_dir, 'index.html')
+
     return {
         'message': 'Campus Runner Backend API',
         'version': '1.0.0',
@@ -682,6 +688,21 @@ def root():
             'admin': '/api/admin/*'
         }
     }, 200
+
+
+@app.route('/<path:path>', methods=['GET'])
+def spa_fallback(path):
+    if path.startswith('api/') or path.startswith('socket.io'):
+        return jsonify({'error': 'Endpoint not found'}), 404
+
+    asset_path = os.path.join(frontend_dist_dir, path)
+    if os.path.exists(asset_path):
+        return send_from_directory(frontend_dist_dir, path)
+
+    if os.path.exists(frontend_index_file):
+        return send_from_directory(frontend_dist_dir, 'index.html')
+
+    return jsonify({'error': 'Frontend build not found'}), 404
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
