@@ -9,7 +9,7 @@ const SOCKET_URL = API_BASE_URL.replace(/\/api$/, "");
 export function connectSocket(token: string) {
   if (socket) {
     if (activeToken !== null && activeToken.length === token.length &&
-        Buffer.from(activeToken).equals(Buffer.from(token))) {
+        activeToken.split("").every((c, i) => c === token[i])) {
       return socket;
     }
 
