@@ -12,7 +12,7 @@ gunicorn==22.0.0
 eventlet==0.41.0
 # razorpay==1.4.2  # uncomment when real Razorpay keys are configured
 Flask-Limiter==3.5.0
-marshmallow==3.21.1
+marshmallow==4.3.0
 pytest==8.3.5
 pytest-cov==7.1.0
 Werkzeug==2.3.7
