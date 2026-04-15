@@ -56,7 +56,7 @@ export function Checkout() {
   const cartItems = cart?.items || [];
   const totalPrice = getTotalPrice();
   const taxes = Math.round(totalPrice * 0.05 * 100) / 100;
-  const deliveryFee = totalPrice > 500 ? 0 : 50;
+  const deliveryFee = totalPrice >= 500 ? 10 : 15;
   const selectedCoupon = availableCoupons.find((coupon) => coupon.code === selectedCouponCode);
   const discountAmount = selectedCoupon
     ? selectedCoupon.discount_type === "delivery"
@@ -113,12 +113,12 @@ export function Checkout() {
   };
 
   const validatePhone = (value: string) => {
-    setPhone(value);
-    const cleaned = value.replace(/[\s\-()]/g, "");
-    const isValid = /^\d{10,}$/.test(cleaned);
+    const cleaned = value.replace(/\D/g, "").slice(0, 10);
+    setPhone(cleaned);
+    const isValid = /^\d{10}$/.test(cleaned);
     setValidationState(prev => ({ ...prev, phone: isValid }));
     if (!isValid && value) {
-      setValidationErrors(prev => ({ ...prev, phone: "Phone number must be 10+ digits" }));
+      setValidationErrors(prev => ({ ...prev, phone: "Phone number must be exactly 10 digits" }));
     } else {
       setValidationErrors(prev => ({ ...prev, phone: undefined }));
     }
@@ -534,11 +534,12 @@ export function Checkout() {
                         if (phone && !validationState.phone) {
                           setValidationErrors(prev => ({ 
                             ...prev, 
-                            phone: "Phone number must be 10+ digits" 
+                            phone: "Phone number must be exactly 10 digits" 
                           }));
                         }
                       }}
-                      placeholder="E.g., +91 98765 43210"
+                      placeholder="E.g., 9876543210"
+                      maxLength={10}
                       className={`w-full px-4 py-3 rounded-lg border-2 transition-colors focus:outline-none ${
                         validationState.phone
                           ? 'border-green-400 focus:border-green-500 bg-green-50'
@@ -699,8 +700,8 @@ export function Checkout() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-700">Delivery Fee</span>
-                  <span className={`font-semibold ${deliveryFee === 0 ? 'text-green-600' : 'text-gray-900'}`}>
-                    {deliveryFee === 0 ? '✓ FREE' : `₹${deliveryFee.toFixed(2)}`}
+                  <span className="font-semibold text-gray-900">
+                    ₹{deliveryFee.toFixed(2)}
                   </span>
                 </div>
                 {discountAmount > 0 && (

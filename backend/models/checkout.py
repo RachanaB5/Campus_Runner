@@ -62,10 +62,8 @@ class Checkout(db.Model):
         """Validate phone number"""
         if not self.customer_phone:
             return False
-        # Remove spaces, dashes, parentheses, and leading +
-        phone = re.sub(r'[\s\-()+ ]', '', self.customer_phone)
-        # Check if it's a valid phone number (10 digits minimum)
-        return bool(re.match(r'^\d{10,}$', phone))
+        phone = re.sub(r'\D', '', self.customer_phone)
+        return bool(re.match(r'^\d{10}$', phone))
     
     def is_all_valid(self):
         """Check if all validations pass"""

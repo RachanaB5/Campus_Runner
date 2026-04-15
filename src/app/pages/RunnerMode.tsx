@@ -261,12 +261,19 @@ export function RunnerMode() {
         },
       });
     } catch (err: any) {
-      setTakenOrderIds((previous) => [...new Set([...previous, orderId])]);
-      showToast(err.message || "Order was already taken");
-      window.setTimeout(() => {
-        setAvailableOrders((previous) => previous.filter((item) => (item.id || item.order_id) !== orderId));
-        setTakenOrderIds((previous) => previous.filter((id) => id !== orderId));
-      }, 900);
+      const message = err.message || "Could not accept this order";
+      showToast(message);
+
+      if (err.status === 409) {
+        setTakenOrderIds((previous) => [...new Set([...previous, orderId])]);
+        window.setTimeout(() => {
+          setAvailableOrders((previous) => previous.filter((item) => (item.id || item.order_id) !== orderId));
+          setTakenOrderIds((previous) => previous.filter((id) => id !== orderId));
+        }, 900);
+      } else {
+        await fetchAvailableOrders();
+        await refreshRunnerContext();
+      }
     } finally {
       setAcceptingOrderId(null);
     }
