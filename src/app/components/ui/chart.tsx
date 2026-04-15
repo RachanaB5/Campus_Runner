@@ -69,6 +69,12 @@ function ChartContainer({
   );
 }
 
+const SAFE_CSS_VALUE = /^[a-zA-Z0-9#(),%. /-]+$/;
+
+function sanitizeCssValue(value: string): string {
+  return SAFE_CSS_VALUE.test(value) ? value : "";
+}
+
 const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
   const colorConfig = Object.entries(config).filter(
     ([, config]) => config.theme || config.color,
@@ -78,19 +84,23 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
     return null;
   }
 
+  const safeId = id.replace(/[^a-zA-Z0-9-_]/g, "");
+
   return (
     <style
       dangerouslySetInnerHTML={{
         __html: Object.entries(THEMES)
           .map(
             ([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
+${prefix} [data-chart=${safeId}] {
 ${colorConfig
   .map(([key, itemConfig]) => {
-    const color =
+    const rawColor =
       itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
       itemConfig.color;
-    return color ? `  --color-${key}: ${color};` : null;
+    const color = rawColor ? sanitizeCssValue(rawColor) : null;
+    const safeKey = key.replace(/[^a-zA-Z0-9-_]/g, "");
+    return color ? `  --color-${safeKey}: ${color};` : null;
   })
   .join("\n")}
 }

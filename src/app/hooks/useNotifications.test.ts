@@ -72,9 +72,13 @@ describe("useNotifications", () => {
   });
 
   it("refreshes on socket notification:new event", async () => {
-    const listeners: Record<string, () => void> = {};
+    const listeners: Record<string, () => void> = Object.create(null);
     const mockSocket = {
-      on: vi.fn((event: string, cb: () => void) => { listeners[event] = cb; }),
+      on: vi.fn((event: string, cb: () => void) => {
+        if (Object.prototype.hasOwnProperty.call(listeners, event) || !(event in Object.prototype)) {
+          listeners[event] = cb;
+        }
+      }),
       off: vi.fn(),
     } as any;
 

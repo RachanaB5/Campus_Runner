@@ -53,12 +53,20 @@ Campus_Runner/
 │   ├── app/
 │   │   ├── components/       # Reusable UI components
 │   │   ├── context/          # Auth & Cart context
+│   │   ├── data/             # Static/mock data
 │   │   ├── hooks/            # Custom React hooks
 │   │   ├── pages/            # Route-level page components
-│   │   └── services/         # API & Socket clients
+│   │   ├── services/         # API & Socket clients
+│   │   └── utils/            # Frontend utilities
+│   ├── styles/               # Global CSS & Tailwind
 │   └── main.tsx
 ├── .env.example              # Environment variable template
-├── .github/workflows/ci.yml  # CI pipeline
+├── .github/workflows/ci.yml  # CI/CD pipeline
+├── docker-compose.yml        # Docker Compose (default)
+├── docker-compose.dev.yml    # Docker Compose (dev overrides)
+├── docker-compose.prod.yml   # Docker Compose (prod overrides)
+├── Dockerfile.backend
+├── Dockerfile.frontend
 ├── package.json              # Frontend dependencies
 └── pytest.ini                # Pytest config
 ```
@@ -94,12 +102,6 @@ Edit `.env` and fill in your values (JWT secret, Razorpay keys, email credential
 cd backend
 pip install -r requirements.txt
 python app.py
-```
-
-Shortcut command:
-
-```bash
-cd backend && pip install -r requirements.txt && python app.py
 ```
 
 The API runs at `http://localhost:5000`. The database and a default admin account are created automatically on first run.
@@ -142,26 +144,33 @@ pytest
 npm test
 ```
 
-Coverage commands:
+Coverage:
 
 ```bash
-# backend coverage
+# backend
 cd backend
 pytest --cov=backend --cov-report=term-missing --cov-report=xml
 
-# frontend coverage
-cd ..
+# frontend
 npm run test:coverage
 ```
 
-## CI Workflows
+---
 
-- `.github/workflows/ci.yml`: backend tests (Py 3.11/3.12), frontend lint, typecheck, tests, and build (`npm run build`), with coverage/build artifacts uploaded.
-- `.github/workflows/test.yml`: focused backend/frontend test workflow with coverage artifacts.
+## CI/CD
+
+`.github/workflows/ci.yml` runs on every push and pull request:
+
+- **Backend** — flake8 lint + pytest with coverage (Python 3.11 & 3.12)
+- **Frontend** — ESLint, TypeScript typecheck, Vitest tests with coverage, production build
+- **Docker** — builds and pushes backend & frontend images to GHCR on `main`/`develop`/`feature/*`/`fix/*` branches
+- **Security** — Trivy filesystem vulnerability scan with SARIF upload
+
+Coverage reports are uploaded to Codecov. Build artifacts are retained for 14 days.
 
 See [DEVOPS.md](./DEVOPS.md) for the full Docker & DevOps reference.
 
-This repository already ignores `dist/` in `.gitignore`; CI builds frontend artifacts in workflow runs instead of relying on committed build output.
+---
 
 ## Notification Channels
 
@@ -191,15 +200,21 @@ This repository already ignores `dist/` in `.gitignore`; CI builds frontend arti
 
 See `.env.example` for the full list. Key variables:
 
-| Variable              | Description                        |
-|-----------------------|------------------------------------|
-| `JWT_SECRET_KEY`      | Secret for signing JWT tokens      |
-| `DATABASE_URL`        | SQLite path (default: auto-set)    |
-| `RAZORPAY_KEY_ID`     | Razorpay API key                   |
-| `RAZORPAY_KEY_SECRET` | Razorpay secret                    |
-| `MAIL_USERNAME`       | Gmail address for sending emails   |
-| `MAIL_PASSWORD`       | Gmail app password (16 chars)      |
-| `ALLOWED_EMAIL_DOMAIN`| Restrict signups to a domain       |
+| Variable                | Description                                  |
+|-------------------------|----------------------------------------------|
+| `JWT_SECRET_KEY`        | Secret for signing JWT tokens                |
+| `SECRET_KEY`            | Flask session secret key                     |
+| `DATABASE_URL`          | SQLite path (default: `sqlite:///campusrunner.db`) |
+| `FRONTEND_URL`          | Frontend origin for CORS                     |
+| `VITE_API_URL`          | Backend URL used by the frontend             |
+| `ALLOWED_EMAIL_DOMAIN`  | Restrict signups to a domain (e.g. `rvu.edu.in`) |
+| `RAZORPAY_KEY_ID`       | Razorpay API key                             |
+| `RAZORPAY_KEY_SECRET`   | Razorpay secret                              |
+| `MAIL_USERNAME`         | Gmail address for sending emails             |
+| `MAIL_PASSWORD`         | Gmail app password (16 chars)                |
+| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name (image uploads)        |
+| `CLOUDINARY_API_KEY`    | Cloudinary API key                           |
+| `CLOUDINARY_API_SECRET` | Cloudinary API secret                        |
 
 ---
 
