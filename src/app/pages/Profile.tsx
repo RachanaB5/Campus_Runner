@@ -34,17 +34,17 @@ function StatCard({ value, label, color, icon: Icon }: any) {
 
 function SectionCard({ title, icon: Icon, open, onToggle, children }: any) {
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
       <button
         type="button"
         onClick={onToggle}
-        className="w-full flex items-center justify-between gap-3 px-6 py-5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+        className="w-full flex items-center justify-between gap-3 px-6 py-5 hover:bg-gray-50 transition-colors text-left"
       >
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+          <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center">
             <Icon className="w-5 h-5 text-orange-600" />
           </div>
-          <span className="text-base font-semibold text-gray-900 dark:text-white">{title}</span>
+          <span className="text-base font-semibold text-gray-900">{title}</span>
         </div>
         {open ? (
           <ChevronUp className="w-5 h-5 text-gray-400 flex-shrink-0" />
@@ -53,7 +53,7 @@ function SectionCard({ title, icon: Icon, open, onToggle, children }: any) {
         )}
       </button>
       {open && (
-        <div className="px-6 pb-6 border-t border-gray-100 dark:border-gray-800 pt-5">
+        <div className="px-6 pb-6 border-t border-gray-100 pt-5">
           {children}
         </div>
       )}
@@ -158,22 +158,22 @@ export function Profile() {
   const isRunner = user?.role === "RUNNER" || user?.role === "runner";
 
   const inputClass =
-    "w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm";
+    "w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm";
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">My Profile</h1>
-        <p className="text-gray-500 dark:text-gray-400 text-sm">Manage your account and preferences.</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-1">My Profile</h1>
+        <p className="text-gray-500 text-sm">Manage your account and preferences.</p>
       </div>
 
       {/* Hero Card — clean, no color banner */}
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm overflow-hidden mb-6 border border-gray-100 dark:border-gray-800">
+      <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-6 border border-gray-100">
         <div className="px-6 py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           {/* Avatar + Name */}
           <div className="flex items-center gap-4">
-            <div className="w-20 h-20 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center overflow-hidden flex-shrink-0 border border-gray-200 dark:border-gray-700">
+            <div className="w-20 h-20 rounded-2xl bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0 border border-gray-200">
               {profile?.avatar_url || profile?.profile_image ? (
                 <ImageWithFallback
                   src={profile.avatar_url || profile.profile_image}
@@ -185,13 +185,13 @@ export function Profile() {
               )}
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">{profile?.name || user?.name}</h2>
+              <h2 className="text-xl font-bold text-gray-900">{profile?.name || user?.name}</h2>
               <div className="flex items-center gap-2 mt-1">
-                <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 dark:bg-orange-900/20 px-2.5 py-0.5 text-xs font-semibold text-orange-600 dark:text-orange-400">
+                <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2.5 py-0.5 text-xs font-semibold text-orange-600">
                   {isRunner ? "🏍️ Runner" : "🛍️ Customer"}
                 </span>
                 {isRunner && profile?.stats?.runner_rating > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-yellow-50 dark:bg-yellow-900/20 px-2.5 py-0.5 text-xs font-semibold text-yellow-700 dark:text-yellow-400">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-yellow-50 px-2.5 py-0.5 text-xs font-semibold text-yellow-700">
                     <Star className="w-3 h-3" />
                     {Number(profile.stats.runner_rating || 0).toFixed(1)}
                   </span>
@@ -201,7 +201,7 @@ export function Profile() {
           </div>
 
           {/* Contact info */}
-          <div className="flex flex-col gap-1.5 text-sm text-gray-500 dark:text-gray-400">
+          <div className="flex flex-col gap-1.5 text-sm text-gray-500">
             <span className="flex items-center gap-2"><Mail className="w-4 h-4 text-gray-400" />{profile?.email}</span>
             {profile?.phone && (
               <span className="flex items-center gap-2"><Phone className="w-4 h-4 text-gray-400" />{profile.phone}</span>
@@ -313,7 +313,7 @@ export function Profile() {
               <button
                 type="button"
                 onClick={() => setEditOpen(false)}
-                className="rounded-xl border border-gray-200 dark:border-gray-700 px-5 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
@@ -348,7 +348,7 @@ export function Profile() {
             <button
               type="button"
               onClick={handlePasswordSave}
-              className="rounded-xl bg-gray-900 dark:bg-white dark:text-gray-900 px-5 py-2.5 text-white text-sm font-semibold hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
+              className="rounded-xl bg-gray-900 px-5 py-2.5 text-white text-sm font-semibold hover:bg-gray-800 transition-colors"
             >
               Update Password
             </button>
@@ -373,9 +373,9 @@ export function Profile() {
             ].map(([key, label]) => (
               <label
                 key={key}
-                className="flex items-center justify-between rounded-xl bg-gray-50 dark:bg-gray-800 px-4 py-3 cursor-pointer hover:bg-orange-50 dark:hover:bg-gray-700 transition-colors"
+                className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 cursor-pointer hover:bg-orange-50 transition-colors"
               >
-                <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">{label}</span>
+                <span className="text-sm text-gray-700 font-medium">{label}</span>
                 <input
                   type="checkbox"
                   className="w-4 h-4 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
@@ -396,22 +396,22 @@ export function Profile() {
         >
           <div className="space-y-3">
             {savedMethods.map((method) => (
-              <div key={method.id} className="rounded-xl border border-gray-100 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-800">
+              <div key={method.id} className="rounded-xl border border-gray-100 p-4 bg-gray-50">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <CreditCard className="w-5 h-5 text-orange-500" />
                     <div>
-                      <p className="font-semibold text-gray-900 dark:text-white text-sm">
+                      <p className="font-semibold text-gray-900 text-sm">
                         {method.type === "card"
                           ? `${method.card_brand || "Card"} ending in ${method.card_last4}`
                           : method.upi_id}
                         {method.is_default && (
-                          <span className="ml-2 text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 px-2 py-0.5 rounded-full">
+                          <span className="ml-2 text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
                             Default
                           </span>
                         )}
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      <p className="text-xs text-gray-500 mt-0.5">
                         {method.type === "card"
                           ? `${method.card_holder_name} · Exp ${method.card_expiry}`
                           : method.upi_nickname || "Saved UPI"}
@@ -448,19 +448,19 @@ export function Profile() {
               </div>
             ))}
 
-            <div className="rounded-xl border border-dashed border-orange-200 dark:border-orange-800 p-4">
+            <div className="rounded-xl border border-dashed border-orange-200 p-4">
               <div className="flex gap-2 mb-3">
                 <button
                   type="button"
                   onClick={() => setAddMethodType("upi")}
-                  className="rounded-xl bg-orange-50 dark:bg-orange-900/30 px-4 py-2 text-orange-700 dark:text-orange-400 text-sm font-semibold hover:bg-orange-100 transition-colors"
+                  className="rounded-xl bg-orange-50 px-4 py-2 text-orange-700 text-sm font-semibold hover:bg-orange-100 transition-colors"
                 >
                   + Add UPI
                 </button>
                 <button
                   type="button"
                   onClick={() => setAddMethodType("card")}
-                  className="rounded-xl bg-orange-50 dark:bg-orange-900/30 px-4 py-2 text-orange-700 dark:text-orange-400 text-sm font-semibold hover:bg-orange-100 transition-colors"
+                  className="rounded-xl bg-orange-50 px-4 py-2 text-orange-700 text-sm font-semibold hover:bg-orange-100 transition-colors"
                 >
                   + Add Card
                 </button>
@@ -489,7 +489,7 @@ export function Profile() {
       {/* Logout */}
       <button
         onClick={handleLogout}
-        className="mt-6 w-full flex items-center justify-center gap-2 rounded-2xl border-2 border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 py-3.5 font-semibold hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+        className="mt-6 w-full flex items-center justify-center gap-2 rounded-2xl border-2 border-red-200 text-red-600 py-3.5 font-semibold hover:bg-red-50 transition-colors"
       >
         <LogOut className="w-5 h-5" />
         Sign Out
