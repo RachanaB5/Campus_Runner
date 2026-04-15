@@ -1,0 +1,61 @@
+version: 2
+updates:
+  # Frontend dependencies
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+    reviewers:
+      - "RachanaB5"
+    labels:
+      - "dependencies"
+      - "frontend"
+    allow:
+      - dependency-type: "all"
+    open-pull-requests-limit: 5
+
+  # Backend dependencies
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+    reviewers:
+      - "RachanaB5"
+    labels:
+      - "dependencies"
+      - "backend"
+    allow:
+      - dependency-type: "all"
+    open-pull-requests-limit: 5
+
+  # Docker base images
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+    reviewers:
+      - "RachanaB5"
+    labels:
+      - "dependencies"
+      - "docker"
+    open-pull-requests-limit: 3
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+    reviewers:
+      - "RachanaB5"
+    labels:
+      - "dependencies"
+      - "ci-cd"
+    open-pull-requests-limit: 5

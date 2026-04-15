@@ -1,0 +1,36 @@
+# Campus Runner CODEOWNERS
+# Automatically assign reviewers based on code changes
+
+# Backend
+/backend/ @RachanaB5
+/backend/models/ @RachanaB5
+/backend/routes/ @RachanaB5
+/backend/services/ @RachanaB5
+/backend/tests/ @RachanaB5
+
+# Frontend
+/src/ @RachanaB5
+/src/app/components/ @RachanaB5
+/src/app/pages/ @RachanaB5
+/src/app/context/ @RachanaB5
+/src/app/hooks/ @RachanaB5
+/src/app/services/ @RachanaB5
+
+# Infrastructure & DevOps
+/Dockerfile* @RachanaB5
+/docker-compose* @RachanaB5
+/nginx* @RachanaB5
+/.github/workflows/ @RachanaB5
+/DEVOPS.md @RachanaB5
+
+# Configuration
+/.env.example @RachanaB5
+/package.json @RachanaB5
+/backend/requirements.txt @RachanaB5
+/pytest.ini @RachanaB5
+/tsconfig.json @RachanaB5
+
+# Catch-all for root config files
+/*.md @RachanaB5
+/*.yml @RachanaB5
+/*.yaml @RachanaB5
