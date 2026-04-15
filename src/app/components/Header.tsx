@@ -41,7 +41,7 @@ export function Header() {
         const response = await api.getRunnerActiveDelivery();
         if (!isMounted) return;
         
-        setActiveDelivery((prev) => {
+        setActiveDelivery((prev: any) => {
           if (!prev && response.active) {
             playChime();
             toast.info("Active Delivery details updated!");

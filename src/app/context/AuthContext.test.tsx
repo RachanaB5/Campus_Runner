@@ -121,9 +121,11 @@ describe("AuthContext", () => {
       screen.getByRole("button", { name: "Logout" }).click();
     });
 
-    expect(removeToken).toHaveBeenCalled();
-    expect(screen.getByTestId("logged-in").textContent).toBe("false");
-    expect(screen.getByTestId("user-name").textContent).toBe("none");
+    await waitFor(() => {
+      expect(removeToken).toHaveBeenCalled();
+      expect(screen.getByTestId("logged-in").textContent).toBe("false");
+      expect(screen.getByTestId("user-name").textContent).toBe("none");
+    });
   });
 
   it("returns requires_verification on register without immediate token", async () => {

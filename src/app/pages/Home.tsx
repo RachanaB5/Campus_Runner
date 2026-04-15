@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { Search, ShoppingCart, X, Plus, Minus, Trash2, ArrowRight, Bike, MapPin } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Search, ShoppingCart, X, Bike, MapPin } from "lucide-react";
 import { menuItems } from "../data/mockData";
 import { FoodCard } from "../components/FoodCard";
 import { FoodDetailModal } from "../components/FoodDetailModal";
@@ -10,7 +10,7 @@ import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router";
 import useSound from "use-sound";
 import * as api from "../services/api";
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 
 interface Food {
   id: string;
@@ -78,9 +78,7 @@ export function Home() {
   const [availableDeliveries, setAvailableDeliveries] = useState<any[]>([]);
   const [isLoadingDeliveries, setIsLoadingDeliveries] = useState(false);
   const [selectedFoodId, setSelectedFoodId] = useState<string | null>(null);
-  const drawerRef = useRef<HTMLDivElement>(null);
-
-  const { cart, removeFromCart, updateCartItem, isLoading: cartLoading, getTotalItems, getTotalPrice } = useCart();
+  const { getTotalItems } = useCart();
   const { isLoggedIn } = useAuth();
   const navigate = useNavigate();
   const [canRunDeliveries, setCanRunDeliveries] = useState(false);
@@ -182,18 +180,6 @@ export function Home() {
   });
 
   const cartCount = getTotalItems();
-  const cartTotal = getTotalPrice();
-
-  const handleQuantityChange = async (itemId: string, newQty: number) => {
-    if (newQty < 1) await removeFromCart(itemId);
-    else await updateCartItem(itemId, newQty);
-  };
-
-  const handleCheckout = () => {
-    setCartOpen(false);
-    navigate("/checkout");
-  };
-
   const handleRunnerClick = async () => {
     if (!isLoggedIn) {
       navigate("/login");

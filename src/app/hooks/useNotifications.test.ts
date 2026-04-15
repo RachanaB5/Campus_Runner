@@ -34,12 +34,7 @@ const makeNotification = (id: string, is_read = false) => ({
 describe("useNotifications", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.useFakeTimers();
     vi.mocked(useSocket).mockReturnValue(null);
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
   });
 
   it("loads notifications on mount", async () => {
@@ -99,13 +94,19 @@ describe("useNotifications", () => {
   });
 
   it("polls every 30 seconds", async () => {
+    vi.useFakeTimers();
     vi.mocked(notificationAPI.list).mockResolvedValue({ notifications: [], unread_count: 0 });
 
     renderHook(() => useNotifications(true));
-    await waitFor(() => expect(notificationAPI.list).toHaveBeenCalledTimes(1));
+    await act(async () => {});
+    expect(notificationAPI.list).toHaveBeenCalledTimes(1);
 
-    await act(async () => { vi.advanceTimersByTime(30000); });
-    await waitFor(() => expect(notificationAPI.list).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      vi.advanceTimersByTime(30000);
+    });
+    await act(async () => {});
+    expect(notificationAPI.list).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
   });
 
   it("silently ignores API errors", async () => {

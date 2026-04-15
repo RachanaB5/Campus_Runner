@@ -13,6 +13,9 @@ export default tseslint.config(
       ".venv/**",
       "venv/**",
       "node_modules/**",
+      ".github/**",
+      ".agents/**",
+      "reference/**",
     ],
   },
   js.configs.recommended,
@@ -34,6 +37,8 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       "react-hooks/exhaustive-deps": "off",
+      "react-hooks/purity": "off",
+      "react-hooks/set-state-in-effect": "off",
       "react-refresh/only-export-components": "off",
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],

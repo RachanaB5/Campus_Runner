@@ -21,12 +21,14 @@ def get_dashboard_stats():
             return jsonify({'error': 'Unauthorized'}), 403
         
         total_orders = Order.query.count()
+        total_users = User.query.count()
         pending_orders = Order.query.filter_by(status='pending').count()
         completed_orders = Order.query.filter_by(status='delivered').count()
         total_revenue = db.session.query(db.func.sum(Order.total_amount)).filter_by(status='delivered').scalar() or 0.0
         
         return jsonify({
             'total_orders': total_orders,
+            'total_users': total_users,
             'pending_orders': pending_orders,
             'completed_orders': completed_orders,
             'total_revenue': total_revenue,
@@ -171,6 +173,7 @@ def update_user_role(user_id):
         if not target_user:
             return jsonify({'error': 'User not found'}), 404
         
+        data = request.get_json(silent=True) or {}
         new_role = data.get('role')
         allowed_roles = {'customer', 'runner', 'staff', 'admin'}
         if new_role not in allowed_roles:
