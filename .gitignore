@@ -6,6 +6,19 @@
 reference/
 backend/.env.example
 
+# One-off / generated docs
+GITHUB_CONFIG.md
+docs/
+
+# One-off backend scripts
+backend/fix_db.py
+backend/init_db.py
+backend/create_admin.py
+backend/run.sh
+backend/setup.sh
+setup.sh
+setup.bat
+
 # Python
 __pycache__/
 *.pyc
