@@ -10,6 +10,7 @@ interface RunnerState {
   activeDeliveryId: string | null;
   completedDeliveries: number;
   totalEarnings: number;
+  averageRating: number;
   status: string;
   loading: boolean;
 }
@@ -21,6 +22,7 @@ const DEFAULT_STATE: RunnerState = {
   activeDeliveryId: null,
   completedDeliveries: 0,
   totalEarnings: 0,
+  averageRating: 0,
   status: "offline",
   loading: true,
 };
@@ -44,6 +46,7 @@ export function useRunnerState() {
         activeDeliveryId: data.active_delivery_id || null,
         completedDeliveries: Number(data.completed_deliveries || 0),
         totalEarnings: Number(data.total_earnings || 0),
+        averageRating: Number(data.average_rating || 0),
         status: data.status || (data.is_available ? "online" : "offline"),
         loading: false,
       });

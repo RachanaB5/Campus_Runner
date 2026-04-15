@@ -4,6 +4,8 @@ import { PhoneCall } from "lucide-react";
 import confetti from "canvas-confetti";
 import { useOrderTracking } from "../hooks/useOrderTracking";
 import { RateOrderSheet } from "../components/RateOrderSheet";
+import { StarRating } from "../components/StarRating";
+import { api } from "../services/api";
 
 export function OrderTrackingPage() {
   const { id = "" } = useParams();
@@ -24,6 +26,18 @@ export function OrderTrackingPage() {
   }, [location.state]);
   const tracking = useOrderTracking(id, initialTracking);
   const [ratingOpen, setRatingOpen] = useState(false);
+  const [runnerRating, setRunnerRating] = useState<number>(0);
+  const [runnerReview, setRunnerReview] = useState("");
+  const [runnerSubmitting, setRunnerSubmitting] = useState(false);
+  const [runnerRated, setRunnerRated] = useState(false);
+
+  useEffect(() => {
+    if (tracking?.delivery_review?.rating) {
+      setRunnerRating(Number(tracking.delivery_review.rating));
+      setRunnerReview(tracking.delivery_review.review || "");
+      setRunnerRated(true);
+    }
+  }, [tracking?.delivery_review?.rating, tracking?.delivery_review?.review]);
 
   useEffect(() => {
     // If we have items in state, we just arrived from checkout
@@ -45,6 +59,17 @@ export function OrderTrackingPage() {
   if (!tracking) {
     return <div className="max-w-4xl mx-auto px-4 py-12 text-gray-500">Loading order tracking...</div>;
   }
+
+  const handleRunnerRating = async () => {
+    if (!tracking.delivery_id || runnerRating < 1) return;
+    try {
+      setRunnerSubmitting(true);
+      await api.rateDelivery(tracking.delivery_id, runnerRating, runnerReview.trim());
+      setRunnerRated(true);
+    } finally {
+      setRunnerSubmitting(false);
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -112,11 +137,45 @@ export function OrderTrackingPage() {
           </div>
 
           {tracking.status === "delivered" && (
-            <div className="rounded-2xl border border-orange-100 bg-orange-50 p-5">
-              <p className="text-xl font-bold text-gray-900">Delivered! How was your order?</p>
-              <button type="button" onClick={() => setRatingOpen(true)} className="mt-4 rounded-xl bg-orange-500 px-4 py-3 text-white font-semibold">
-                Rate This Order
-              </button>
+            <div className="space-y-4">
+              {tracking.runner && (
+                <div className="rounded-2xl border border-green-100 bg-green-50 p-5">
+                  <p className="text-lg font-bold text-gray-900">Rate your runner</p>
+                  <p className="mt-1 text-sm text-gray-600">
+                    {tracking.runner.name} delivered your order. Your feedback helps keep runner quality high.
+                  </p>
+                  <div className="mt-4">
+                    <StarRating value={runnerRating} onChange={runnerRated ? undefined : setRunnerRating} readonly={runnerRated} size={24} />
+                  </div>
+                  <textarea
+                    value={runnerReview}
+                    onChange={(event) => setRunnerReview(event.target.value)}
+                    disabled={runnerRated}
+                    placeholder="Optional note for the runner..."
+                    className="mt-4 w-full rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm text-gray-700 focus:outline-none focus:border-green-400 disabled:bg-green-100"
+                    rows={3}
+                  />
+                  {runnerRated ? (
+                    <p className="mt-3 text-sm font-semibold text-green-700">Thanks for rating your runner.</p>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleRunnerRating}
+                      disabled={runnerSubmitting || runnerRating < 1}
+                      className="mt-4 rounded-xl bg-green-500 px-4 py-3 text-white font-semibold disabled:opacity-60"
+                    >
+                      {runnerSubmitting ? "Submitting..." : "Submit Runner Rating"}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <div className="rounded-2xl border border-orange-100 bg-orange-50 p-5">
+                <p className="text-xl font-bold text-gray-900">Delivered! How was your order?</p>
+                <button type="button" onClick={() => setRatingOpen(true)} className="mt-4 rounded-xl bg-orange-500 px-4 py-3 text-white font-semibold">
+                  Rate Food Items
+                </button>
+              </div>
             </div>
           )}
         </div>

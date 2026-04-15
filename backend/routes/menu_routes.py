@@ -61,7 +61,7 @@ def _review_payload(review):
 def get_all_foods():
     """Get all available food items"""
     try:
-        foods = Food.query.all()
+        foods = Food.query.filter_by(available=True).all()
         return jsonify({
             'foods': [food.to_dict() for food in foods]
         }), 200
@@ -82,7 +82,8 @@ def search_foods():
                 Food.name.ilike(f'%{query}%'),
                 Food.category.ilike(f'%{query}%'),
                 Food.description.ilike(f'%{query}%')
-            )
+            ),
+            Food.available.is_(True)
         ).all()
         
         return jsonify({
@@ -97,7 +98,7 @@ def get_foods_by_category(category):
     try:
         category_key = (category or '').strip()
         normalized_aliases = CATEGORY_ALIASES.get(category_key.lower(), [category_key])
-        foods = Food.query.filter(Food.category.in_(normalized_aliases)).all()
+        foods = Food.query.filter(Food.category.in_(normalized_aliases), Food.available.is_(True)).all()
         return jsonify({
             'foods': [food.to_dict() for food in foods]
         }), 200

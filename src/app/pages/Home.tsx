@@ -96,9 +96,9 @@ export function Home() {
       return;
     }
 
-    api.getRunnerProfile()
+    api.getRunnerStatus()
       .then((runner) => {
-        setCanRunDeliveries(Boolean(runner?.id));
+        setCanRunDeliveries(Boolean(runner?.is_runner));
         setIsRunnerOnline(Boolean(runner?.is_available));
       })
       .catch(() => {
@@ -121,8 +121,8 @@ export function Home() {
     const refreshRunnerProfile = async () => {
       if (!isLoggedIn) return;
       try {
-        const runner = await api.getRunnerProfile();
-        setCanRunDeliveries(Boolean(runner?.id));
+        const runner = await api.getRunnerStatus();
+        setCanRunDeliveries(Boolean(runner?.is_runner));
         setIsRunnerOnline(Boolean(runner?.is_available));
       } catch {
         setCanRunDeliveries(false);

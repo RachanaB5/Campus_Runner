@@ -362,7 +362,8 @@ try:
         run_startup_migrations()
         print("✅ Database tables created")
         try:
-            from seed import seed_sample_reviews
+            from seed import seed_sample_reviews, sync_menu_catalog
+            sync_menu_catalog(app)
             seed_sample_reviews()
         except Exception as seed_error:
             print(f"⚠️ Review seed warning: {seed_error}")
