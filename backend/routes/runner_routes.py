@@ -220,6 +220,7 @@ def get_runner_status():
             'active_delivery_id': active_delivery.id if active_delivery else None,
             'completed_deliveries': runner.total_deliveries or 0,
             'total_earnings': runner.total_earnings or 0,
+            'average_rating': round(float(runner.average_rating or 0), 1),
             'status': runner.status or ('online' if runner.is_available else 'offline'),
         }), 200
     except Exception as e:

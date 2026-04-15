@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Bell, Bike, CheckCircle, DollarSign, PhoneCall, Power, TrendingUp } from "lucide-react";
+import { AlertCircle, Bike, CheckCircle, DollarSign, PhoneCall, Power, Star, TrendingUp } from "lucide-react";
 import { useNavigate } from "react-router";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
@@ -59,6 +59,7 @@ export function RunnerMode() {
   const [activeDeliveryLabel, setActiveDeliveryLabel] = useState<string>("");
   const [activeCustomerPhone, setActiveCustomerPhone] = useState<string | null>(null);
   const [activeAddress, setActiveAddress] = useState<string>("");
+  const [activeCustomerName, setActiveCustomerName] = useState<string>("");
   const [runnerDeliveries, setRunnerDeliveries] = useState(0);
   const [runnerEarnings, setRunnerEarnings] = useState(0);
   const [runnerQueueMessage, setRunnerQueueMessage] = useState("");
@@ -101,17 +102,20 @@ export function RunnerMode() {
         setActiveDeliveryLabel(
           active.order?.token_number || active.details?.token_number || active.delivery_id,
         );
+        setActiveCustomerName(active.customer_name || active.details?.customer_name || "");
         setActiveCustomerPhone(active.customer_phone || active.details?.customer_phone || null);
         setActiveAddress(active.order?.delivery_address || active.details?.delivery_address || "");
       } else {
         setActiveDeliveryId(null);
         setActiveDeliveryLabel("");
+        setActiveCustomerName("");
         setActiveCustomerPhone(null);
         setActiveAddress("");
       }
     } catch {
       setActiveDeliveryId(null);
       setActiveDeliveryLabel("");
+      setActiveCustomerName("");
       setActiveCustomerPhone(null);
       setActiveAddress("");
     }
@@ -238,6 +242,11 @@ export function RunnerMode() {
       const response = await api.acceptOrder(orderId);
       setAvailableOrders((previous) => previous.filter((item) => (item.id || item.order_id) !== orderId));
       showToast(response.message || "Order accepted");
+      setActiveDeliveryId(response.delivery_id);
+      setActiveDeliveryLabel(response.order?.token_number || response.order?.order_number || response.delivery_id);
+      setActiveCustomerName(response.order?.customer_name || "");
+      setActiveAddress(response.order?.delivery_address || "");
+      setActiveCustomerPhone(null);
       localStorage.setItem("runner-open-delivery", response.delivery_id);
       window.dispatchEvent(new CustomEvent("runner:active-delivery-changed", {
         detail: { deliveryId: response.delivery_id },
@@ -270,9 +279,9 @@ export function RunnerMode() {
       { label: "Lifetime deliveries", value: runnerDeliveries, color: "from-orange-500 to-red-500", icon: Bike },
       { label: "Total earnings", value: runnerEarnings, color: "from-green-500 to-emerald-600", icon: DollarSign },
       { label: "Active delivery", value: activeCount, color: "from-blue-500 to-indigo-600", icon: TrendingUp },
-      { label: "Open orders", value: availableOrders.length, color: "from-purple-500 to-fuchsia-600", icon: Bell },
+      { label: "Runner rating", value: runner.averageRating > 0 ? runner.averageRating.toFixed(1) : "New", color: "from-purple-500 to-fuchsia-600", icon: Star },
     ],
-    [activeCount, availableOrders.length, runnerDeliveries, runnerEarnings],
+    [activeCount, runner.averageRating, runnerDeliveries, runnerEarnings],
   );
 
   if (!isLoggedIn) {
@@ -389,7 +398,7 @@ export function RunnerMode() {
                 <div>
                   <p className="text-xs uppercase tracking-[0.2em] text-orange-500 font-semibold">In progress</p>
                   <h3 className="text-xl font-bold text-gray-900 mt-2">Order {activeDeliveryLabel}</h3>
-                  <p className="text-sm text-gray-500 mt-1">{user?.name}</p>
+                  <p className="text-sm text-gray-500 mt-1">{activeCustomerName || user?.name}</p>
                 </div>
                 {activeAddress && (
                   <p className="text-sm text-gray-700">

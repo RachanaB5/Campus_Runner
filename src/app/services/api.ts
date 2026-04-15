@@ -432,6 +432,7 @@ export const acceptDelivery = runnerAPI.acceptDelivery;
 export const getAvailableOrders = runnerAPI.getAvailableOrders;
 export const acceptOrder = runnerAPI.acceptOrder;
 export const getRunnerProfile = runnerAPI.getRunnerProfile;
+export const getRunnerStatus = runnerAPI.getRunnerStatus;
 
 // Admin API
 export const adminAPI = {

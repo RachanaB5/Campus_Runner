@@ -416,6 +416,7 @@ def get_order_tracking(order_id):
 
         return jsonify({
             'order_id': order.id,
+            'delivery_id': delivery.id if delivery else None,
             'token_number': order.order_number,
             'status': order.status,
             'payment_method': order.payment_method,
@@ -430,6 +431,10 @@ def get_order_tracking(order_id):
             'delivery_otp': delivery_otp,
             'pickup_otp': pickup_otp,
             'runner': runner_info,
+            'delivery_review': {
+                'rating': delivery.rating if delivery else None,
+                'review': delivery.review if delivery else None,
+            },
             'timeline': timeline,
         }), 200
     except Exception as e:
