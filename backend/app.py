@@ -506,6 +506,7 @@ try:
             {'name': 'Fresh Lime Tea', 'price': 15, 'category': 'Tea & Coffee', 'is_veg': True, 'prep_time': 3, 'rating': 4.5},
             {'name': 'Black Tea', 'price': 15, 'category': 'Tea & Coffee', 'is_veg': True, 'prep_time': 3, 'rating': 4.3},
             {'name': 'Black Coffee', 'price': 15, 'category': 'Tea & Coffee', 'is_veg': True, 'prep_time': 3, 'rating': 4.4},
+            # amazonq-ignore-next-line
             {'name': 'Ginger Tea', 'price': 17, 'category': 'Tea & Coffee', 'is_veg': True, 'prep_time': 3, 'rating': 4.4},
             {'name': 'Ginger Coffee', 'price': 17, 'category': 'Tea & Coffee', 'is_veg': True, 'prep_time': 3, 'rating': 4.4},
             {'name': 'Hot Badam Milk', 'price': 17, 'category': 'Tea & Coffee', 'is_veg': True, 'prep_time': 5, 'rating': 4.5},

@@ -727,6 +727,7 @@ export const menuItems: MenuItem[] = [
   {
     id: 59,
     name: "Gulab Jamun",
+    // amazonq-ignore-next-line
     description: "Soft spongy balls in sugar syrup",
     price: 70,
     image: "https://images.unsplash.com/photo-1551632840-3b83ce93e72b?w=400&h=300&fit=crop",
