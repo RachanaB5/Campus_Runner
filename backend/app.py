@@ -65,7 +65,7 @@ if 'MAIL_SUPPRESS_SEND' in os.environ:
     app.config['MAIL_SUPPRESS_SEND'] = _env_bool('MAIL_SUPPRESS_SEND', False)
 
 # Initialize extensions
-from models import db
+from backend.models import db
 db.init_app(app)
 
 def _normalize_origin(origin: str) -> str:
@@ -175,18 +175,18 @@ except Exception as config_error:
     print(f"⚠️ Error printing config: {str(config_error)}")
 
 # Register blueprints (routes)
-from routes.auth_routes import auth_bp
-from routes.menu_routes import menu_bp
-from routes.order_routes import order_bp
-from routes.runner_routes import runner_bp
-from routes.staff_admin_routes import staff_admin_bp
-from routes.cart_routes import cart_bp
-from routes.checkout_routes import checkout_bp
-from routes.rewards_routes import rewards_bp
-from routes.payment_routes import payment_bp
-from routes.payment_methods_routes import payment_methods_bp
-from routes.notification_routes import notification_bp
-from routes.review_routes import review_bp
+from backend.routes.auth_routes import auth_bp
+from backend.routes.menu_routes import menu_bp
+from backend.routes.order_routes import order_bp
+from backend.routes.runner_routes import runner_bp
+from backend.routes.staff_admin_routes import staff_admin_bp
+from backend.routes.cart_routes import cart_bp
+from backend.routes.checkout_routes import checkout_bp
+from backend.routes.rewards_routes import rewards_bp
+from backend.routes.payment_routes import payment_bp
+from backend.routes.payment_methods_routes import payment_methods_bp
+from backend.routes.notification_routes import notification_bp
+from backend.routes.review_routes import review_bp
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(menu_bp, url_prefix='/api/menu')
@@ -369,7 +369,7 @@ try:
             print(f"⚠️ Review seed warning: {seed_error}")
         
         # Auto-initialize database on app startup if empty
-        from models import Food
+        from backend.models import Food
         if Food.query.count() == 0:
             foods_data = [
             # MEALS
@@ -633,7 +633,7 @@ try:
         
         # Create default admin user if doesn't exist
         try:
-            from models import User
+            from backend.models import User
             import uuid
             admin_email = 'admin@rvu.edu.in'
             existing_admin = User.query.filter_by(email=admin_email).first()
@@ -710,7 +710,7 @@ def test_email():
         </html>
         """
         
-        from utils import send_otp_email_sync
+        from backend.utils import send_otp_email_sync
         sent, error = send_otp_email_sync(
             app,
             "Campus Runner - Test Email",
