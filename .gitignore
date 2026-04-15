@@ -1,8 +1,10 @@
 # Agents / GitHub Copilot config
 .agents/
+.github/skills/
 
 # Reference files
 reference/
+backend/.env.example
 
 # Python
 __pycache__/
