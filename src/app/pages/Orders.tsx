@@ -13,6 +13,7 @@ export function Orders() {
   const [isLoading, setIsLoading] = useState(true);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [ratingOrderId, setRatingOrderId] = useState<string | null>(null);
+  const [ratingDeliveryId, setRatingDeliveryId] = useState<string | null>(null);
   const [isReordering, setIsReordering] = useState<string | null>(null);
   const { clearCart, addToCart } = useCart();
   const navigate = useNavigate();
@@ -137,7 +138,7 @@ export function Orders() {
                       <p className="text-2xl font-bold text-gray-900">₹{Number(order.total_amount).toFixed(2)}</p>
                       <p className="text-sm text-green-600 font-medium">+{Math.floor(order.total_amount / 10)} pts</p>
                       {order.has_unreviewed_items && (
-                        <button type="button" onClick={(e) => { e.stopPropagation(); setRatingOrderId(order.id); }} className="mt-2 rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700">
+                        <button type="button" onClick={(e) => { e.stopPropagation(); setRatingOrderId(order.id); setRatingDeliveryId(order.delivery?.id || null); }} className="mt-2 rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700">
                           Rate Order
                         </button>
                       )}
@@ -287,7 +288,7 @@ export function Orders() {
           </div>
         )}
       </div>
-      <RateOrderSheet orderId={ratingOrderId} open={Boolean(ratingOrderId)} onClose={() => setRatingOrderId(null)} onSubmitted={fetchMyOrders} />
+      <RateOrderSheet orderId={ratingOrderId} deliveryId={ratingDeliveryId} open={Boolean(ratingOrderId)} onClose={() => { setRatingOrderId(null); setRatingDeliveryId(null); }} onSubmitted={fetchMyOrders} />
     </div>
   );
 }

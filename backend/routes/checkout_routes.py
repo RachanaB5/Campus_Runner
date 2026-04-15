@@ -8,7 +8,7 @@ import re
 
 checkout_bp = Blueprint('checkout', __name__)
 MIN_DELIVERY_FEE = 10.0
-MAX_DELIVERY_FEE = 15.0
+MAX_DELIVERY_FEE = 10.0
 
 
 def _parse_redeemed_voucher(transaction: RewardTransaction | None):
@@ -40,20 +40,13 @@ def _compute_voucher_discount(voucher, subtotal: float, delivery_fee: float) -> 
 
 
 def _campus_delivery_fee(subtotal: float) -> float:
-    return MIN_DELIVERY_FEE if subtotal >= 500 else MAX_DELIVERY_FEE
+    """Flat ₹10 delivery fee for campus canteen — no tiered or tax logic."""
+    return 10.0
 
 
 def _normalize_delivery_fee(value, subtotal: float) -> float:
-    try:
-        requested_fee = round(float(value), 2)
-    except (TypeError, ValueError):
-        return _campus_delivery_fee(subtotal)
-
-    if requested_fee < MIN_DELIVERY_FEE:
-        return MIN_DELIVERY_FEE
-    if requested_fee > MAX_DELIVERY_FEE:
-        return MAX_DELIVERY_FEE
-    return requested_fee
+    """Always return the flat campus delivery fee."""
+    return 10.0
 
 def generate_order_number():
     """Generate unique order number"""
@@ -231,7 +224,7 @@ def confirm_checkout():
             )
             order_items.append(order_item)
         
-        tax_amount = round(float(data.get('tax_amount', round(subtotal * 0.05, 2))), 2)
+        tax_amount = 0.0  # No tax for campus canteen
         delivery_fee = _normalize_delivery_fee(data.get('delivery_fee'), subtotal)
         discount_amount = 0.0
         discount_code = None
@@ -406,9 +399,9 @@ def get_checkout_summary():
             if food:
                 subtotal += float(food.price) * int(item.get('quantity', 1))
 
-        tax_amount = round(subtotal * 0.05, 2)
+        tax_amount = 0.0  # No tax for campus canteen
         delivery_fee = _campus_delivery_fee(subtotal)
-        final_total = round(subtotal + tax_amount + delivery_fee, 2)
+        final_total = round(subtotal + delivery_fee, 2)
 
         return jsonify({
             'subtotal': subtotal,

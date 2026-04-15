@@ -383,6 +383,9 @@ def update_delivery_status(delivery_id):
             order = Order.query.get(delivery.order_id)
             if order:
                 order.status = 'delivered'
+                if runner:
+                    delivery_charge = float(order.delivery_fee or 10.0)
+                    runner.total_earnings = round((runner.total_earnings or 0) + delivery_charge * 0.5, 2)
         
         db.session.commit()
         
@@ -519,14 +522,7 @@ def get_available_orders():
             'orders': orders_data,
             'available_orders': orders_data,
             'count': len(orders_data),
-            'self_excluded_orders': self_excluded_orders,
-            'message': (
-                'No other users have open orders right now.'
-                if len(orders_data) == 0 and self_excluded_orders == 0
-                else 'Your own open orders are hidden here. Switch to a different customer account to test runner acceptance.'
-                if len(orders_data) == 0 and self_excluded_orders > 0
-                else None
-            ),
+            'message': 'No open orders right now. Stay online and we\'ll notify you when new orders come in.' if len(orders_data) == 0 else None,
         }), 200
     
     except Exception as e:
@@ -789,6 +785,8 @@ def update_delivery_status_v2(delivery_id):
             order.delivered_at = datetime.utcnow()
             runner.total_deliveries = (runner.total_deliveries or 0) + 1
             runner.status = 'online'
+            delivery_charge = float(order.delivery_fee or 10.0)
+            runner.total_earnings = round((runner.total_earnings or 0) + delivery_charge * 0.5, 2)
             reward_points = _calculate_runner_reward_points(order.total_amount)
             _reward_runner(user_id, order, reward_points)
             _emit_order_status(order, 'delivered', runner_name)
@@ -1013,6 +1011,8 @@ def confirm_delivery(order_id):
         if runner:
             runner.total_deliveries = (runner.total_deliveries or 0) + 1
             runner.status = 'online'
+            delivery_charge = float(order.delivery_fee or 10.0)
+            runner.total_earnings = round((runner.total_earnings or 0) + delivery_charge * 0.5, 2)
         
         db.session.commit()
         

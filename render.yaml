@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: campus-runner-backend
+    env: python
+    region: singapore
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && gunicorn -c ../gunicorn.conf.py "app:app"
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: DEBUG
+        value: "False"
+      - key: DATABASE_URL
+        value: sqlite:///campusrunner.db
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: SECRET_KEY
+        generateValue: true
+      - key: MAIL_SERVER
+        value: smtp.gmail.com
+      - key: MAIL_PORT
+        value: "587"
+      - key: MAIL_USE_TLS
+        value: "True"
+      # Set MAIL_USERNAME and MAIL_PASSWORD manually in Render dashboard

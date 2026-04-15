@@ -77,29 +77,29 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 dark:from-gray-950 dark:to-gray-900 flex items-center justify-center px-4">
       <div className="max-w-md w-full">
         {/* Logo and Title */}
         <div className="text-center mb-8">
           <div className="w-20 h-20 bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
             <ShoppingBag className="w-10 h-10 text-white" />
           </div>
-          <h1 className="text-3xl text-gray-900 mb-2">Campus Runner</h1>
-          <p className="text-gray-600">RV University Canteen</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Campus Runner</h1>
+          <p className="text-gray-600 dark:text-gray-400">RV University Canteen</p>
         </div>
 
         {/* Login/Signup Form */}
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-8 border border-gray-100 dark:border-gray-800">
           <div className="flex gap-2 mb-6">
             <button
               onClick={() => {
                 setIsLogin(true);
                 setError("");
               }}
-              className={`flex-1 py-2 rounded-lg transition-colors font-medium ${
+              className={`flex-1 py-2 rounded-lg transition-colors font-semibold text-sm ${
                 isLogin
-                  ? "bg-orange-500 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  ? "bg-orange-500 text-white shadow-sm"
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
               }`}
             >
               Login
@@ -109,10 +109,10 @@ export function Login() {
                 setIsLogin(false);
                 setError("");
               }}
-              className={`flex-1 py-2 rounded-lg transition-colors font-medium ${
+              className={`flex-1 py-2 rounded-lg transition-colors font-semibold text-sm ${
                 !isLogin
-                  ? "bg-orange-500 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  ? "bg-orange-500 text-white shadow-sm"
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
               }`}
             >
               Sign Up
@@ -128,7 +128,7 @@ export function Login() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div>
-                <label className="block text-sm text-gray-700 mb-2">Full Name</label>
+                <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Full Name</label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
@@ -136,7 +136,7 @@ export function Login() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Enter your name"
-                    className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -144,19 +144,19 @@ export function Login() {
 
             {!isLogin && (
               <div>
-                <label className="block text-sm text-gray-700 mb-2">Phone (Optional)</label>
+                <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Phone (Optional)</label>
                 <input
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="Enter your phone number"
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 />
               </div>
             )}
 
             {!isLogin && (
-              <div className="flex items-start gap-3 mt-4 p-4 bg-orange-50/50 border border-orange-100 rounded-lg">
+              <div className="flex items-start gap-3 mt-4 p-4 bg-orange-50/70 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800/40 rounded-lg">
                 <input
                   type="checkbox"
                   id="isRunner"
@@ -165,16 +165,16 @@ export function Login() {
                   className="mt-1 w-4 h-4 text-orange-500 bg-white rounded border-gray-300 focus:ring-orange-500"
                 />
                 <div className="flex flex-col">
-                  <label htmlFor="isRunner" className="text-sm text-gray-900 font-medium cursor-pointer">
+                  <label htmlFor="isRunner" className="text-sm text-gray-900 dark:text-white font-semibold cursor-pointer">
                     Sign up as a Delivery Runner
                   </label>
-                  <span className="text-xs text-gray-500">Deliver food on campus and earn points!</span>
+                  <span className="text-xs text-gray-600 dark:text-gray-400">Deliver food on campus and earn points!</span>
                 </div>
               </div>
             )}
 
             <div>
-              <label className="block text-sm text-gray-700 mb-2">RV University Email</label>
+              <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">RV University Email</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
@@ -182,14 +182,14 @@ export function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="yourname@rvu.edu.in"
-                  className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 />
               </div>
-              <p className="text-xs text-gray-500 mt-1">Must end with @rvu.edu.in</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Must end with @rvu.edu.in</p>
             </div>
 
             <div>
-              <label className="block text-sm text-gray-700 mb-2">Password</label>
+              <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
@@ -197,7 +197,7 @@ export function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
-                  className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 />
               </div>
             </div>
@@ -228,7 +228,7 @@ export function Login() {
           </form>
         </div>
 
-        <p className="text-center text-gray-600 mt-6 text-sm">
+        <p className="text-center text-gray-600 dark:text-gray-400 mt-6 text-sm">
           {isLogin ? "Don't have an account? " : "Already have an account? "}
           <button
             onClick={() => {

@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Award, Bike, CreditCard, LogOut, Mail, Phone, ShoppingBag, User } from "lucide-react";
+import {
+  Award, Bike, CreditCard, LogOut, Mail, Phone, ShoppingBag, User,
+  ChevronDown, ChevronUp, Star, Edit2, Lock, Bell,
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { api, API_BASE_URL, getToken } from "../services/api";
 import { useNavigate } from "react-router";
@@ -17,10 +20,43 @@ const defaultPreferences = {
 
 function StatCard({ value, label, color, icon: Icon }: any) {
   return (
-    <div className={`rounded-xl bg-gradient-to-br ${color} p-6 text-white`}>
-      <Icon className="w-8 h-8 mb-3" />
-      <p className="text-3xl mb-1">{value}</p>
-      <p className="text-white/85">{label}</p>
+    <div className={`rounded-2xl bg-gradient-to-br ${color} p-5 text-white flex flex-col gap-3 shadow-lg`}>
+      <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+        <Icon className="w-5 h-5" />
+      </div>
+      <div>
+        <p className="text-2xl font-bold">{value}</p>
+        <p className="text-white/80 text-sm mt-0.5">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+function SectionCard({ title, icon: Icon, open, onToggle, children }: any) {
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center justify-between gap-3 px-6 py-5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+            <Icon className="w-5 h-5 text-orange-600" />
+          </div>
+          <span className="text-base font-semibold text-gray-900 dark:text-white">{title}</span>
+        </div>
+        {open ? (
+          <ChevronUp className="w-5 h-5 text-gray-400 flex-shrink-0" />
+        ) : (
+          <ChevronDown className="w-5 h-5 text-gray-400 flex-shrink-0" />
+        )}
+      </button>
+      {open && (
+        <div className="px-6 pb-6 border-t border-gray-100 dark:border-gray-800 pt-5">
+          {children}
+        </div>
+      )}
     </div>
   );
 }
@@ -34,8 +70,6 @@ export function Profile() {
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [paymentsOpen, setPaymentsOpen] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
   const [editForm, setEditForm] = useState({ name: "", phone: "", avatar_url: "" });
   const [passwordForm, setPasswordForm] = useState({ current_password: "", new_password: "", confirm_password: "" });
@@ -64,12 +98,6 @@ export function Profile() {
     loadPaymentMethods().catch(() => undefined);
   }, []);
 
-  const showMessage = (text: string) => {
-    setError("");
-    setMessage(text);
-    window.setTimeout(() => setMessage(""), 2000);
-  };
-
   const handleLogout = async () => {
     await logout();
     navigate("/login");
@@ -77,7 +105,6 @@ export function Profile() {
 
   const handleProfileSave = async () => {
     setSavingProfile(true);
-    setError("");
     try {
       const token = getToken();
       const response = await fetch(`${API_BASE_URL}/auth/profile`, {
@@ -93,15 +120,13 @@ export function Profile() {
         }),
       });
       const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to save profile");
-      }
+      if (!response.ok) throw new Error(data.error || "Failed to save profile");
       updateUser(data.user);
       await loadProfile();
-      showMessage("Profile updated!");
+      toast.success("Profile updated!");
       setEditOpen(false);
     } catch (err: any) {
-      setError(err?.message || "Failed to save profile");
+      toast.error(err?.message || "Failed to save profile");
     } finally {
       setSavingProfile(false);
     }
@@ -110,7 +135,7 @@ export function Profile() {
   const handlePasswordSave = async () => {
     await api.changePassword(passwordForm);
     setPasswordForm({ current_password: "", new_password: "", confirm_password: "" });
-    showMessage("Password changed successfully");
+    toast.success("Password changed successfully");
     setPasswordOpen(false);
   };
 
@@ -118,7 +143,7 @@ export function Profile() {
     const nextPrefs = { ...preferences, [key]: value };
     setPreferences(nextPrefs);
     await api.updateNotificationPreferences({ [key]: value });
-    showMessage("Saved ✓");
+    toast.success("Saved ✓");
   };
 
   const handleAddMethod = async () => {
@@ -126,216 +151,351 @@ export function Profile() {
     setNewMethod({ upi_id: "", upi_nickname: "", card_number: "", card_holder_name: "", card_expiry: "", card_pin: "" });
     setAddMethodType("");
     await loadPaymentMethods();
-    showMessage("Payment method saved");
+    toast.success("Payment method saved");
   };
 
   const memberSince = useMemo(() => profile?.member_since || "Recently", [profile?.member_since]);
+  const isRunner = user?.role === "RUNNER" || user?.role === "runner";
+
+  const inputClass =
+    "w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm";
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
+    <div className="max-w-5xl mx-auto px-4 py-8">
+      {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-3xl text-gray-900 mb-2">Profile</h1>
-        <p className="text-gray-600">Manage your account, delivery preferences, and saved payments.</p>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">My Profile</h1>
+        <p className="text-gray-500 dark:text-gray-400 text-sm">Manage your account and preferences.</p>
       </div>
 
-      {message && <div className="mb-4 rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-green-700">{message}</div>}
-      {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">{error}</div>}
+      {/* Hero Card */}
+      <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-md overflow-hidden mb-6 border border-gray-100 dark:border-gray-800">
+        {/* Cover */}
+        <div className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 h-28 relative" />
 
-      <div className="bg-white rounded-xl shadow-md overflow-hidden mb-8">
-        <div className="bg-gradient-to-r from-orange-500 to-red-500 h-32" />
-        <div className="px-6 pb-6">
-          <div className="flex items-end gap-4 -mt-16 mb-6">
-            <div className="w-32 h-32 bg-white rounded-full border-4 border-white shadow-lg overflow-hidden flex items-center justify-center">
+        {/* Avatar + Info */}
+        <div className="px-6 pb-6 -mt-14 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div className="flex items-end gap-4">
+            <div className="w-28 h-28 rounded-2xl border-4 border-white dark:border-gray-900 shadow-xl bg-gradient-to-br from-orange-100 to-orange-200 flex items-center justify-center overflow-hidden flex-shrink-0">
               {profile?.avatar_url || profile?.profile_image ? (
-                <ImageWithFallback src={profile.avatar_url || profile.profile_image} alt={profile?.name} className="h-full w-full object-cover" />
+                <ImageWithFallback
+                  src={profile.avatar_url || profile.profile_image}
+                  alt={profile?.name}
+                  className="h-full w-full object-cover"
+                />
               ) : (
-                <User className="w-16 h-16 text-gray-400" />
+                <User className="w-14 h-14 text-orange-400" />
               )}
             </div>
-            <div className="pb-4">
-              <h2 className="text-2xl text-gray-900">{profile?.name || user?.name}</h2>
-              <p className="text-gray-600">{profile?.role || user?.role || "Customer"}</p>
+            <div className="pb-1">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{profile?.name || user?.name}</h2>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 dark:bg-orange-900/30 px-3 py-0.5 text-xs font-semibold text-orange-700 dark:text-orange-400">
+                  {isRunner ? "🏍️ Runner" : "🛍️ Customer"}
+                </span>
+                {isRunner && profile?.stats?.runner_rating > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-yellow-50 dark:bg-yellow-900/20 px-3 py-0.5 text-xs font-semibold text-yellow-700 dark:text-yellow-400">
+                    <Star className="w-3 h-3" />
+                    {Number(profile.stats.runner_rating || 0).toFixed(1)}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <Mail className="w-5 h-5 text-gray-400" />
-              <div>
-                <p className="text-xs text-gray-500">Email</p>
-                <p className="text-gray-900">{profile?.email}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <Phone className="w-5 h-5 text-gray-400" />
-              <div>
-                <p className="text-xs text-gray-500">Phone</p>
-                <p className="text-gray-900">{profile?.phone || "Add your mobile number"}</p>
-              </div>
-            </div>
+          <div className="flex flex-col gap-1 sm:items-end text-sm text-gray-500 dark:text-gray-400 pb-1">
+            <span className="flex items-center gap-1.5"><Mail className="w-4 h-4" />{profile?.email}</span>
+            {profile?.phone && (
+              <span className="flex items-center gap-1.5"><Phone className="w-4 h-4" />{profile.phone}</span>
+            )}
+            <span className="text-xs text-gray-400 mt-1">Member since {memberSince}</span>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <StatCard value={profile?.stats?.total_points || 0} label="Total Points" color="from-orange-500 to-red-500" icon={Award} />
-        <StatCard value={profile?.stats?.total_orders || 0} label="Total Orders" color="from-blue-500 to-indigo-600" icon={ShoppingBag} />
-        <StatCard value={profile?.stats?.deliveries_made || 0} label="Deliveries Made" color="from-green-500 to-emerald-600" icon={Bike} />
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+        <StatCard
+          value={profile?.stats?.total_points || 0}
+          label="Reward Points"
+          color="from-orange-500 to-red-500"
+          icon={Award}
+        />
+        <StatCard
+          value={profile?.stats?.total_orders || 0}
+          label="Total Orders"
+          color="from-blue-500 to-indigo-600"
+          icon={ShoppingBag}
+        />
+        {isRunner ? (
+          <StatCard
+            value={profile?.stats?.deliveries_made || 0}
+            label="Deliveries Made"
+            color="from-emerald-500 to-green-600"
+            icon={Bike}
+          />
+        ) : (
+          <StatCard
+            value={profile?.stats?.deliveries_made || 0}
+            label="Deliveries Made"
+            color="from-emerald-500 to-green-600"
+            icon={Bike}
+          />
+        )}
       </div>
 
-      <div className="space-y-4">
-        {user?.role !== "RUNNER" && user?.role !== "runner" && (
-          <section className="bg-gradient-to-r from-orange-500 to-red-500 rounded-xl shadow-md p-6 text-white mb-6">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-              <div>
-                <h3 className="text-xl font-bold flex items-center gap-2">
-                  <Bike className="w-6 h-6" /> Become a Delivery Runner!
-                </h3>
-                <p className="mt-1 text-orange-100 max-w-sm">
-                  Earn points, get free meals, and help your campus community by delivering food.
-                </p>
-              </div>
+      {/* Become a Runner Banner — only for non-runners */}
+      {!isRunner && (
+        <div className="mb-6 rounded-2xl bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 p-6 text-white shadow-lg">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                <Bike className="w-5 h-5" /> Become a Delivery Runner!
+              </h3>
+              <p className="text-orange-100 text-sm mt-1 max-w-sm">
+                Earn points, get rewards, and help your campus community by delivering food on campus.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await api.registerAsRunner({ vehicle_type: "bicycle", license_number: "N/A" });
+                  toast.success("Welcome aboard! Refresh the page to access Runner Mode.");
+                  setTimeout(() => window.location.reload(), 1500);
+                } catch (err: any) {
+                  toast.error(err.message || "Failed to upgrade account.");
+                }
+              }}
+              className="bg-white text-orange-600 px-6 py-2.5 rounded-xl font-bold shadow hover:bg-orange-50 transition-colors shrink-0 text-sm"
+            >
+              Join Now →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Stacked Sections */}
+      <div className="space-y-3">
+        {/* Edit Profile */}
+        <SectionCard title="Edit Profile" icon={Edit2} open={editOpen} onToggle={() => setEditOpen((v) => !v)}>
+          <div className="space-y-3">
+            <input
+              className={inputClass}
+              placeholder="Full Name"
+              value={editForm.name}
+              onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))}
+            />
+            <input
+              className={inputClass}
+              placeholder="Phone Number"
+              value={editForm.phone}
+              onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))}
+            />
+            <input
+              className={inputClass}
+              placeholder="Avatar URL (optional)"
+              value={editForm.avatar_url}
+              onChange={(e) => setEditForm((p) => ({ ...p, avatar_url: e.target.value }))}
+            />
+            <input
+              className={`${inputClass} opacity-60 cursor-not-allowed`}
+              value={profile?.email || ""}
+              disabled
+            />
+            <div className="flex gap-3 pt-1">
               <button
                 type="button"
-                onClick={async () => {
-                  try {
-                    await api.registerAsRunner({ vehicle_type: 'bicycle', license_number: 'N/A' });
-                    toast.success("Welcome aboard! Refresh the page to access Runner Mode.");
-                    setTimeout(() => window.location.reload(), 1500);
-                  } catch (err: any) {
-                    toast.error(err.message || "Failed to upgrade account.");
-                  }
-                }}
-                className="bg-white text-orange-600 px-6 py-3 rounded-lg font-bold shadow hover:bg-orange-50 transition-colors shrink-0"
+                onClick={handleProfileSave}
+                disabled={savingProfile}
+                className="rounded-xl bg-orange-500 hover:bg-orange-600 px-5 py-2.5 text-white text-sm font-semibold disabled:opacity-60 transition-colors"
               >
-                Join Now
+                {savingProfile ? "Saving..." : "Save Changes"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditOpen(false)}
+                className="rounded-xl border border-gray-200 dark:border-gray-700 px-5 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                Cancel
               </button>
             </div>
-          </section>
-        )}
-        <section className="bg-white rounded-xl shadow-md p-6">
-          <button type="button" onClick={() => setEditOpen((value) => !value)} className="w-full flex items-center justify-between text-left">
-            <span className="text-xl text-gray-900">Edit Profile</span>
-            <span>{editOpen ? "∧" : "∨"}</span>
-          </button>
-          {editOpen && (
-            <div className="mt-5 space-y-4">
-              <input className="w-full rounded-xl border px-4 py-3" placeholder="Full Name" value={editForm.name} onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))} />
-              <input className="w-full rounded-xl border px-4 py-3" placeholder="Phone Number" value={editForm.phone} onChange={(e) => setEditForm((prev) => ({ ...prev, phone: e.target.value }))} />
-              <input className="w-full rounded-xl border px-4 py-3" placeholder="Avatar URL" value={editForm.avatar_url} onChange={(e) => setEditForm((prev) => ({ ...prev, avatar_url: e.target.value }))} />
-              <input className="w-full rounded-xl border bg-gray-50 px-4 py-3 text-gray-500" value={profile?.email || ""} disabled />
-              <div className="flex gap-3">
-                <button type="button" onClick={handleProfileSave} disabled={savingProfile} className="rounded-xl bg-orange-500 px-5 py-3 text-white font-semibold disabled:cursor-not-allowed disabled:opacity-60">
-                  {savingProfile ? "Saving..." : "Save Changes"}
+          </div>
+        </SectionCard>
+
+        {/* Change Password */}
+        <SectionCard title="Change Password" icon={Lock} open={passwordOpen} onToggle={() => setPasswordOpen((v) => !v)}>
+          <div className="space-y-3">
+            <input
+              type="password"
+              className={inputClass}
+              placeholder="Current Password"
+              value={passwordForm.current_password}
+              onChange={(e) => setPasswordForm((p) => ({ ...p, current_password: e.target.value }))}
+            />
+            <input
+              type="password"
+              className={inputClass}
+              placeholder="New Password"
+              value={passwordForm.new_password}
+              onChange={(e) => setPasswordForm((p) => ({ ...p, new_password: e.target.value }))}
+            />
+            <input
+              type="password"
+              className={inputClass}
+              placeholder="Confirm New Password"
+              value={passwordForm.confirm_password}
+              onChange={(e) => setPasswordForm((p) => ({ ...p, confirm_password: e.target.value }))}
+            />
+            <button
+              type="button"
+              onClick={handlePasswordSave}
+              className="rounded-xl bg-gray-900 dark:bg-white dark:text-gray-900 px-5 py-2.5 text-white text-sm font-semibold hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
+            >
+              Update Password
+            </button>
+          </div>
+        </SectionCard>
+
+        {/* Notification Preferences */}
+        <SectionCard
+          title="Notification Preferences"
+          icon={Bell}
+          open={prefsOpen}
+          onToggle={() => setPrefsOpen((v) => !v)}
+        >
+          <div className="space-y-2">
+            {[
+              ["order_updates", "Order status updates"],
+              ["runner_assigned", "Runner assigned alerts"],
+              ["order_delivered", "Delivery confirmations"],
+              ["new_orders_available", "New orders (Runner mode)"],
+              ["reward_points", "Reward points earned"],
+              ["promotions", "Promotions & offers"],
+            ].map(([key, label]) => (
+              <label
+                key={key}
+                className="flex items-center justify-between rounded-xl bg-gray-50 dark:bg-gray-800 px-4 py-3 cursor-pointer hover:bg-orange-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">{label}</span>
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
+                  checked={Boolean((preferences as any)[key])}
+                  onChange={(e) => handlePreferenceToggle(key, e.target.checked)}
+                />
+              </label>
+            ))}
+          </div>
+        </SectionCard>
+
+        {/* Payment Methods */}
+        <SectionCard
+          title="Payment Methods"
+          icon={CreditCard}
+          open={paymentsOpen}
+          onToggle={() => setPaymentsOpen((v) => !v)}
+        >
+          <div className="space-y-3">
+            {savedMethods.map((method) => (
+              <div key={method.id} className="rounded-xl border border-gray-100 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-800">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <CreditCard className="w-5 h-5 text-orange-500" />
+                    <div>
+                      <p className="font-semibold text-gray-900 dark:text-white text-sm">
+                        {method.type === "card"
+                          ? `${method.card_brand || "Card"} ending in ${method.card_last4}`
+                          : method.upi_id}
+                        {method.is_default && (
+                          <span className="ml-2 text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 px-2 py-0.5 rounded-full">
+                            Default
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                        {method.type === "card"
+                          ? `${method.card_holder_name} · Exp ${method.card_expiry}`
+                          : method.upi_nickname || "Saved UPI"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 text-xs">
+                    {!method.is_default && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await api.setDefaultPaymentMethod(method.id);
+                          await loadPaymentMethods();
+                          toast.success("Default payment updated");
+                        }}
+                        className="text-orange-600 font-semibold hover:underline"
+                      >
+                        Set Default
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await api.removeSavedPaymentMethod(method.id);
+                        await loadPaymentMethods();
+                        toast.success("Payment method removed");
+                      }}
+                      className="text-red-500 font-semibold hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <div className="rounded-xl border border-dashed border-orange-200 dark:border-orange-800 p-4">
+              <div className="flex gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => setAddMethodType("upi")}
+                  className="rounded-xl bg-orange-50 dark:bg-orange-900/30 px-4 py-2 text-orange-700 dark:text-orange-400 text-sm font-semibold hover:bg-orange-100 transition-colors"
+                >
+                  + Add UPI
                 </button>
-                <button type="button" onClick={() => { setError(""); setEditOpen(false); }} className="rounded-xl border px-5 py-3 font-semibold">Cancel</button>
+                <button
+                  type="button"
+                  onClick={() => setAddMethodType("card")}
+                  className="rounded-xl bg-orange-50 dark:bg-orange-900/30 px-4 py-2 text-orange-700 dark:text-orange-400 text-sm font-semibold hover:bg-orange-100 transition-colors"
+                >
+                  + Add Card
+                </button>
               </div>
-            </div>
-          )}
-        </section>
-
-        <section className="bg-white rounded-xl shadow-md p-6">
-          <button type="button" onClick={() => setPasswordOpen((value) => !value)} className="w-full flex items-center justify-between text-left">
-            <span className="text-xl text-gray-900">Change Password</span>
-            <span>{passwordOpen ? "∧" : "∨"}</span>
-          </button>
-          {passwordOpen && (
-            <div className="mt-5 space-y-4">
-              <input type="password" className="w-full rounded-xl border px-4 py-3" placeholder="Current Password" value={passwordForm.current_password} onChange={(e) => setPasswordForm((prev) => ({ ...prev, current_password: e.target.value }))} />
-              <input type="password" className="w-full rounded-xl border px-4 py-3" placeholder="New Password" value={passwordForm.new_password} onChange={(e) => setPasswordForm((prev) => ({ ...prev, new_password: e.target.value }))} />
-              <input type="password" className="w-full rounded-xl border px-4 py-3" placeholder="Confirm New Password" value={passwordForm.confirm_password} onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirm_password: e.target.value }))} />
-              <button type="button" onClick={handlePasswordSave} className="rounded-xl bg-gray-900 px-5 py-3 text-white font-semibold">Update Password</button>
-            </div>
-          )}
-        </section>
-
-        <section className="bg-white rounded-xl shadow-md p-6">
-          <button type="button" onClick={() => setPrefsOpen((value) => !value)} className="w-full flex items-center justify-between text-left">
-            <span className="text-xl text-gray-900">Notification Preferences</span>
-            <span>{prefsOpen ? "∧" : "∨"}</span>
-          </button>
-          {prefsOpen && (
-            <div className="mt-5 space-y-4">
-              {[
-                ["order_updates", "Order status updates"],
-                ["runner_assigned", "Runner assigned alerts"],
-                ["order_delivered", "Delivery confirmations"],
-                ["new_orders_available", "New orders (Runner mode)"],
-                ["reward_points", "Reward points earned"],
-                ["promotions", "Promotions & offers"],
-              ].map(([key, label]) => (
-                <label key={key} className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3">
-                  <span className="text-gray-700">{label}</span>
-                  <input type="checkbox" checked={Boolean((preferences as any)[key])} onChange={(e) => handlePreferenceToggle(key, e.target.checked)} />
-                </label>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section className="bg-white rounded-xl shadow-md p-6">
-          <button type="button" onClick={() => setPaymentsOpen((value) => !value)} className="w-full flex items-center justify-between text-left">
-            <span className="text-xl text-gray-900">Payment Methods</span>
-            <span>{paymentsOpen ? "∧" : "∨"}</span>
-          </button>
-          {paymentsOpen && (
-            <div className="mt-5 space-y-4">
-              {savedMethods.map((method) => (
-                <div key={method.id} className="rounded-xl border border-gray-100 p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3">
-                      <CreditCard className="w-5 h-5 text-orange-500 mt-1" />
-                      <div>
-                        <p className="font-semibold text-gray-900">
-                          {method.type === "card" ? `${method.card_brand || "Card"} ending in ${method.card_last4}` : method.upi_id}
-                          {method.is_default ? " [Default]" : ""}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {method.type === "card" ? `${method.card_holder_name} • Exp ${method.card_expiry}` : method.upi_nickname || "Saved UPI"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 text-sm">
-                      {!method.is_default && <button type="button" onClick={async () => { await api.setDefaultPaymentMethod(method.id); await loadPaymentMethods(); showMessage("Default payment updated"); }} className="text-orange-600 font-semibold">Set Default</button>}
-                      <button type="button" onClick={async () => { await api.removeSavedPaymentMethod(method.id); await loadPaymentMethods(); showMessage("Payment method removed"); }} className="text-red-600 font-semibold">Remove</button>
-                    </div>
-                  </div>
+              {addMethodType === "upi" && (
+                <div className="space-y-2">
+                  <input className={inputClass} placeholder="UPI ID (e.g. rahul@okaxis)" value={newMethod.upi_id} onChange={(e) => setNewMethod((p: any) => ({ ...p, upi_id: e.target.value }))} />
+                  <input className={inputClass} placeholder="Nickname (e.g. My GPay)" value={newMethod.upi_nickname} onChange={(e) => setNewMethod((p: any) => ({ ...p, upi_nickname: e.target.value }))} />
+                  <button type="button" onClick={handleAddMethod} className="rounded-xl bg-orange-500 px-5 py-2.5 text-white text-sm font-semibold hover:bg-orange-600 transition-colors">Save UPI</button>
                 </div>
-              ))}
-
-              <div className="rounded-xl border border-dashed border-orange-200 p-4">
-                <div className="flex gap-3 mb-4">
-                  <button type="button" onClick={() => setAddMethodType("upi")} className="rounded-xl bg-orange-50 px-4 py-2 text-orange-700 font-semibold">Add UPI</button>
-                  <button type="button" onClick={() => setAddMethodType("card")} className="rounded-xl bg-orange-50 px-4 py-2 text-orange-700 font-semibold">Add Card</button>
+              )}
+              {addMethodType === "card" && (
+                <div className="space-y-2">
+                  <input className={inputClass} placeholder="Card Number" value={newMethod.card_number} onChange={(e) => setNewMethod((p: any) => ({ ...p, card_number: e.target.value }))} />
+                  <input className={inputClass} placeholder="Cardholder Name" value={newMethod.card_holder_name} onChange={(e) => setNewMethod((p: any) => ({ ...p, card_holder_name: e.target.value }))} />
+                  <input className={inputClass} placeholder="MM/YYYY" value={newMethod.card_expiry} onChange={(e) => setNewMethod((p: any) => ({ ...p, card_expiry: e.target.value }))} />
+                  <input type="password" className={inputClass} placeholder="PIN" value={newMethod.card_pin} onChange={(e) => setNewMethod((p: any) => ({ ...p, card_pin: e.target.value }))} />
+                  <button type="button" onClick={handleAddMethod} className="rounded-xl bg-orange-500 px-5 py-2.5 text-white text-sm font-semibold hover:bg-orange-600 transition-colors">Save Card</button>
                 </div>
-                {addMethodType === "upi" && (
-                  <div className="space-y-3">
-                    <input className="w-full rounded-xl border px-4 py-3" placeholder="rahul@okaxis" value={newMethod.upi_id} onChange={(e) => setNewMethod((prev: any) => ({ ...prev, upi_id: e.target.value }))} />
-                    <input className="w-full rounded-xl border px-4 py-3" placeholder="My GPay" value={newMethod.upi_nickname} onChange={(e) => setNewMethod((prev: any) => ({ ...prev, upi_nickname: e.target.value }))} />
-                    <button type="button" onClick={handleAddMethod} className="rounded-xl bg-orange-500 px-5 py-3 text-white font-semibold">Save UPI</button>
-                  </div>
-                )}
-                {addMethodType === "card" && (
-                  <div className="space-y-3">
-                    <input className="w-full rounded-xl border px-4 py-3" placeholder="Card Number" value={newMethod.card_number} onChange={(e) => setNewMethod((prev: any) => ({ ...prev, card_number: e.target.value }))} />
-                    <input className="w-full rounded-xl border px-4 py-3" placeholder="Cardholder Name" value={newMethod.card_holder_name} onChange={(e) => setNewMethod((prev: any) => ({ ...prev, card_holder_name: e.target.value }))} />
-                    <input className="w-full rounded-xl border px-4 py-3" placeholder="MM/YYYY" value={newMethod.card_expiry} onChange={(e) => setNewMethod((prev: any) => ({ ...prev, card_expiry: e.target.value }))} />
-                    <input type="password" className="w-full rounded-xl border px-4 py-3" placeholder="PIN" value={newMethod.card_pin} onChange={(e) => setNewMethod((prev: any) => ({ ...prev, card_pin: e.target.value }))} />
-                    <button type="button" onClick={handleAddMethod} className="rounded-xl bg-orange-500 px-5 py-3 text-white font-semibold">Save Card</button>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
-          )}
-        </section>
+          </div>
+        </SectionCard>
       </div>
 
-      <button onClick={handleLogout} className="mt-8 w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg flex items-center justify-center gap-2 transition-colors">
+      {/* Logout */}
+      <button
+        onClick={handleLogout}
+        className="mt-6 w-full flex items-center justify-center gap-2 rounded-2xl border-2 border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 py-3.5 font-semibold hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+      >
         <LogOut className="w-5 h-5" />
-        <span>Logout</span>
+        Sign Out
       </button>
-
-      <p className="text-center text-sm text-gray-500 mt-6">Member since {memberSince}</p>
     </div>
   );
 }
