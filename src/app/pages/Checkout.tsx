@@ -55,15 +55,15 @@ export function Checkout() {
 
   const cartItems = cart?.items || [];
   const totalPrice = getTotalPrice();
-  const taxes = Math.round(totalPrice * 0.05 * 100) / 100;
-  const deliveryFee = totalPrice >= 500 ? 10 : 15;
+  const taxes = 0; // No tax for campus canteen
+  const deliveryFee = 10; // Flat ₹10 delivery fee
   const selectedCoupon = availableCoupons.find((coupon) => coupon.code === selectedCouponCode);
   const discountAmount = selectedCoupon
     ? selectedCoupon.discount_type === "delivery"
       ? Math.min(deliveryFee, Number(selectedCoupon.discount_value || 0))
       : Math.min(totalPrice + deliveryFee, Number(selectedCoupon.discount_value || 0))
     : 0;
-  const finalTotal = Math.max(0, totalPrice + taxes + deliveryFee - discountAmount);
+  const finalTotal = Math.max(0, totalPrice + deliveryFee - discountAmount);
 
   useEffect(() => {
     Promise.all([
@@ -694,10 +694,6 @@ export function Checkout() {
                   <span>Subtotal</span>
                   <span className="font-semibold">₹{totalPrice.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-gray-700">
-                  <span>Taxes (5%)</span>
-                  <span className="font-semibold">₹{taxes.toFixed(2)}</span>
-                </div>
                 <div className="flex justify-between">
                   <span className="text-gray-700">Delivery Fee</span>
                   <span className="font-semibold text-gray-900">
@@ -721,14 +717,7 @@ export function Checkout() {
               </div>
 
               {/* Info Box */}
-              {totalPrice < 500 && (
-                <div className="p-4 bg-green-50 border-t border-green-200 flex items-start gap-3">
-                  <Info className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-green-700">
-                    <span className="font-semibold">Add ₹{(500 - totalPrice).toFixed(0)} more</span> for free delivery!
-                  </p>
-                </div>
-              )}
+
 
               {/* Security Badge */}
               <div className="p-4 bg-blue-50 border-t border-blue-200 flex items-center gap-2 justify-center text-blue-700">

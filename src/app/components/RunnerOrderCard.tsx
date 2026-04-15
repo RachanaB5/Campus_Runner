@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Clock3, MapPin, ShoppingBag, Sparkles } from "lucide-react";
+import { Clock3, MapPin, ShoppingBag, Sparkles, CheckCircle2 } from "lucide-react";
 
 interface RunnerOrderCardProps {
   order: any;
@@ -25,11 +25,28 @@ export function RunnerOrderCard({ order, onAccept, acceptingOrderId, isTaken = f
 
   const countdownWidth = `${Math.max(0, Math.min(100, (timeLeft / (5 * 60 * 1000)) * 100))}%`;
   const isAccepting = acceptingOrderId === orderId;
+  const canAccept = !!orderId && !isAccepting && !isTaken && timeLeft > 0;
+
+  const handleCardClick = () => {
+    if (canAccept) onAccept(orderId);
+  };
 
   return (
-    <div className={`overflow-hidden rounded-2xl border border-orange-100 bg-white shadow-lg transition-all duration-500 ${
-      isTaken ? "opacity-40 translate-x-6" : "opacity-100 translate-x-0"
-    }`}>
+    <div
+      role="button"
+      tabIndex={canAccept ? 0 : -1}
+      onKeyDown={(e) => e.key === "Enter" && handleCardClick()}
+      onClick={handleCardClick}
+      className={`overflow-hidden rounded-2xl border bg-white shadow-sm transition-all duration-300 select-none ${
+        isTaken
+          ? "opacity-40 translate-x-6 border-gray-100 cursor-not-allowed"
+          : isAccepting
+          ? "border-emerald-300 shadow-emerald-100 cursor-wait"
+          : canAccept
+          ? "border-orange-100 hover:border-orange-300 hover:shadow-md cursor-pointer active:scale-[0.99]"
+          : "border-gray-100 cursor-not-allowed opacity-60"
+      }`}
+    >
       <div className="p-5">
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
@@ -39,68 +56,87 @@ export function RunnerOrderCard({ order, onAccept, acceptingOrderId, isTaken = f
             </div>
             <h3 className="mt-3 text-lg font-bold text-gray-900">Order #{order.token_number || order.order_number}</h3>
             <p className="mt-1 text-sm text-gray-500">
-              {(order.item_count || 0)} item{order.item_count === 1 ? "" : "s"} • {order.customer_name || "Campus User"}
+              {(order.item_count || 0)} item{order.item_count === 1 ? "" : "s"} · {order.customer_name || "Campus User"}
             </p>
           </div>
-          <span className="text-xs text-gray-400">{Math.max(1, Math.ceil(timeLeft / 60000))}m left</span>
+          <div className="flex flex-col items-end gap-1 flex-shrink-0">
+            <span className="text-xs text-gray-400">{Math.max(1, Math.ceil(timeLeft / 60000))}m left</span>
+            {isAccepting && (
+              <span className="text-xs font-semibold text-emerald-600 animate-pulse">Accepting…</span>
+            )}
+          </div>
         </div>
 
         <div className="space-y-3 text-sm text-gray-700">
           <div className="flex items-start gap-3">
-            <MapPin className="w-4 h-4 text-orange-500 mt-0.5" />
+            <MapPin className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
             <div>
               <p className="font-semibold text-gray-900">Pickup</p>
-              <p>{order.pickup_location || "Campus kitchen"}</p>
+              <p className="text-gray-500">{order.pickup_location || "Campus kitchen"}</p>
             </div>
           </div>
           <div className="flex items-start gap-3">
-            <MapPin className="w-4 h-4 text-emerald-500 mt-0.5" />
+            <MapPin className="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" />
             <div>
               <p className="font-semibold text-gray-900">Deliver</p>
-              <p>{order.delivery_location || order.delivery_address}</p>
+              <p className="text-gray-500">{order.delivery_location || order.delivery_address}</p>
             </div>
           </div>
           <div className="flex items-start gap-3">
-            <ShoppingBag className="w-4 h-4 text-sky-500 mt-0.5" />
+            <ShoppingBag className="w-4 h-4 text-sky-500 mt-0.5 flex-shrink-0" />
             <div>
               <p className="font-semibold text-gray-900">Items</p>
-              <p>
+              <p className="text-gray-500">
                 {(order.items_preview || order.items_summary || []).join(", ") || `${order.item_count || 0} item(s)`}
-                {order.item_count > 2 ? ` +${order.item_count - 2} more` : ""}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="mt-5 flex items-center justify-between rounded-2xl bg-orange-50 px-4 py-3 text-sm">
-          <div className="flex items-center gap-2 text-gray-700">
-            <Clock3 className="w-4 h-4 text-orange-600" />
+        {/* Stats row */}
+        <div className="mt-4 flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 text-sm">
+          <div className="flex items-center gap-2 text-gray-600">
+            <Clock3 className="w-4 h-4 text-orange-500" />
             <span>~{order.estimated_prep_time || 15} mins</span>
           </div>
-          <div className="flex items-center gap-2 font-semibold text-orange-700">
+          <div className="flex items-center gap-2 font-semibold text-orange-600">
             <Sparkles className="w-4 h-4" />
             <span>{order.reward_points || 10} pts</span>
           </div>
         </div>
 
-        <div className="mt-3 rounded-2xl border border-gray-100 px-4 py-3 text-sm">
-          <p className="font-semibold text-orange-600">₹{Number(order.total_amount || 0).toFixed(2)}</p>
-          <p className="mt-1 text-gray-500">
-            {order.payment_status === "paid" ? "Paid" : "Pay on Delivery"} via {String(order.payment_method || "N/A").toUpperCase()}
-          </p>
+        {/* Amount + tap hint */}
+        <div className="mt-3 flex items-center justify-between rounded-xl border border-gray-100 px-4 py-3 text-sm">
+          <div>
+            <p className="font-bold text-gray-900">₹{Number(order.total_amount || 0).toFixed(2)}</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {order.payment_status === "paid" ? "Paid" : "Pay on Delivery"} · {String(order.payment_method || "COD").toUpperCase()}
+            </p>
+          </div>
+          {!isTaken && !isAccepting && canAccept && (
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Tap to accept
+            </div>
+          )}
+          {isAccepting && (
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg animate-pulse">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Accepting…
+            </div>
+          )}
+          {isTaken && (
+            <span className="text-xs text-gray-400 font-medium">Already taken</span>
+          )}
         </div>
-
-        <button
-          type="button"
-          onClick={() => orderId && onAccept(orderId)}
-          disabled={!orderId || isAccepting || isTaken || timeLeft <= 0}
-          className="mt-5 w-full rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 py-3 text-white font-semibold shadow-md hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isTaken ? "Already taken" : isAccepting ? "Accepting..." : "Accept Order"}
-        </button>
       </div>
-      <div className="h-1.5 bg-orange-100">
-        <div className="h-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all duration-1000" style={{ width: countdownWidth }} />
+
+      {/* Countdown bar */}
+      <div className="h-1 bg-gray-100">
+        <div
+          className="h-full bg-gradient-to-r from-orange-400 to-amber-300 transition-all duration-1000"
+          style={{ width: countdownWidth }}
+        />
       </div>
     </div>
   );

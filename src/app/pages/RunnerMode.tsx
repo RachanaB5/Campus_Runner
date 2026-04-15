@@ -63,7 +63,6 @@ export function RunnerMode() {
   const [runnerDeliveries, setRunnerDeliveries] = useState(0);
   const [runnerEarnings, setRunnerEarnings] = useState(0);
   const [runnerQueueMessage, setRunnerQueueMessage] = useState("");
-  const [hiddenOwnOrdersCount, setHiddenOwnOrdersCount] = useState(0);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -85,7 +84,6 @@ export function RunnerMode() {
       const response = await api.getAvailableOrders();
       setAvailableOrders(response.available_orders || []);
       setRunnerQueueMessage(response.message || "");
-      setHiddenOwnOrdersCount(Number(response.self_excluded_orders || 0));
       setError(null);
     } catch (err: any) {
       setError(err.message || "Failed to load runner orders");
@@ -150,7 +148,6 @@ export function RunnerMode() {
         } else {
           setAvailableOrders([]);
           setRunnerQueueMessage("Turn Runner Mode on to start receiving live delivery requests.");
-          setHiddenOwnOrdersCount(0);
         }
         await refreshRunnerContext();
       }
@@ -219,7 +216,6 @@ export function RunnerMode() {
       } else {
         setAvailableOrders([]);
         setRunnerQueueMessage("Turn Runner Mode on to start receiving live delivery requests.");
-        setHiddenOwnOrdersCount(0);
       }
       await refreshRunnerContext();
       showToast(nextOnline ? "Runner mode is live" : "Runner mode paused");
@@ -241,7 +237,8 @@ export function RunnerMode() {
       }
       const response = await api.acceptOrder(orderId);
       setAvailableOrders((previous) => previous.filter((item) => (item.id || item.order_id) !== orderId));
-      showToast(response.message || "Order accepted");
+      showToast(response.message || "Order accepted! See Active Delivery below.");
+      // Update active delivery state — runner stays on dashboard
       setActiveDeliveryId(response.delivery_id);
       setActiveDeliveryLabel(response.order?.token_number || response.order?.order_number || response.delivery_id);
       setActiveCustomerName(response.order?.customer_name || "");
@@ -252,14 +249,7 @@ export function RunnerMode() {
         detail: { deliveryId: response.delivery_id },
       }));
       await refreshRunnerContext();
-      navigate(`/runner/delivery/${response.delivery_id}`, {
-        state: {
-          order: response.order,
-          order_id: orderId,
-          delivery_id: response.delivery_id,
-          pickup_otp: response.pickup_otp,
-        },
-      });
+      // Do NOT auto-navigate — let runner click "Open delivery dashboard" manually
     } catch (err: any) {
       const message = err.message || "Could not accept this order";
       showToast(message);
@@ -354,12 +344,6 @@ export function RunnerMode() {
                 {availableOrders.length} open
               </div>
             </div>
-
-            {hiddenOwnOrdersCount > 0 && (
-              <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                {hiddenOwnOrdersCount} of your own open order{hiddenOwnOrdersCount === 1 ? "" : "s"} are hidden here. Use another customer account to test runner acceptance.
-              </div>
-            )}
 
             {isLoading ? (
               <div className="rounded-2xl border border-orange-100 bg-white p-8 text-gray-500">Loading runner queue...</div>
