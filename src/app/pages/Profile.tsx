@@ -168,15 +168,12 @@ export function Profile() {
         <p className="text-gray-500 dark:text-gray-400 text-sm">Manage your account and preferences.</p>
       </div>
 
-      {/* Hero Card */}
-      <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-md overflow-hidden mb-6 border border-gray-100 dark:border-gray-800">
-        {/* Cover */}
-        <div className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 h-28 relative" />
-
-        {/* Avatar + Info */}
-        <div className="px-6 pb-6 -mt-14 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-          <div className="flex items-end gap-4">
-            <div className="w-28 h-28 rounded-2xl border-4 border-white dark:border-gray-900 shadow-xl bg-gradient-to-br from-orange-100 to-orange-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+      {/* Hero Card — clean, no color banner */}
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm overflow-hidden mb-6 border border-gray-100 dark:border-gray-800">
+        <div className="px-6 py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          {/* Avatar + Name */}
+          <div className="flex items-center gap-4">
+            <div className="w-20 h-20 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center overflow-hidden flex-shrink-0 border border-gray-200 dark:border-gray-700">
               {profile?.avatar_url || profile?.profile_image ? (
                 <ImageWithFallback
                   src={profile.avatar_url || profile.profile_image}
@@ -184,17 +181,17 @@ export function Profile() {
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <User className="w-14 h-14 text-orange-400" />
+                <User className="w-10 h-10 text-gray-400" />
               )}
             </div>
-            <div className="pb-1">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{profile?.name || user?.name}</h2>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">{profile?.name || user?.name}</h2>
               <div className="flex items-center gap-2 mt-1">
-                <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 dark:bg-orange-900/30 px-3 py-0.5 text-xs font-semibold text-orange-700 dark:text-orange-400">
+                <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 dark:bg-orange-900/20 px-2.5 py-0.5 text-xs font-semibold text-orange-600 dark:text-orange-400">
                   {isRunner ? "🏍️ Runner" : "🛍️ Customer"}
                 </span>
                 {isRunner && profile?.stats?.runner_rating > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-yellow-50 dark:bg-yellow-900/20 px-3 py-0.5 text-xs font-semibold text-yellow-700 dark:text-yellow-400">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-yellow-50 dark:bg-yellow-900/20 px-2.5 py-0.5 text-xs font-semibold text-yellow-700 dark:text-yellow-400">
                     <Star className="w-3 h-3" />
                     {Number(profile.stats.runner_rating || 0).toFixed(1)}
                   </span>
@@ -203,12 +200,13 @@ export function Profile() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-1 sm:items-end text-sm text-gray-500 dark:text-gray-400 pb-1">
-            <span className="flex items-center gap-1.5"><Mail className="w-4 h-4" />{profile?.email}</span>
+          {/* Contact info */}
+          <div className="flex flex-col gap-1.5 text-sm text-gray-500 dark:text-gray-400">
+            <span className="flex items-center gap-2"><Mail className="w-4 h-4 text-gray-400" />{profile?.email}</span>
             {profile?.phone && (
-              <span className="flex items-center gap-1.5"><Phone className="w-4 h-4" />{profile.phone}</span>
+              <span className="flex items-center gap-2"><Phone className="w-4 h-4 text-gray-400" />{profile.phone}</span>
             )}
-            <span className="text-xs text-gray-400 mt-1">Member since {memberSince}</span>
+            <span className="text-xs text-gray-400 mt-0.5">Member since {memberSince}</span>
           </div>
         </div>
       </div>
