@@ -112,10 +112,13 @@ CORS(app, resources={
 
 jwt = JWTManager(app)
 
+# FIX 1: Use correct import path for socketio_events (backend.socketio_events, not socketio_events)
+# FIX 2: Gracefully handle missing socketio; use eventlet async_mode for Render compatibility
 try:
     from flask_socketio import SocketIO, join_room
-    socketio = SocketIO(app, cors_allowed_origins=_ALLOWED_ORIGINS)
-    from socketio_events import register_socketio_events
+    socketio = SocketIO(app, cors_allowed_origins=_ALLOWED_ORIGINS, async_mode='eventlet')
+    # FIX: was `from socketio_events import ...` — must be `from backend.socketio_events import ...`
+    from backend.socketio_events import register_socketio_events
 
     @socketio.on('join_user_room')
     def join_user_room(data):
@@ -365,7 +368,8 @@ try:
         run_startup_migrations()
         print("✅ Database tables created")
         try:
-            from seed import seed_sample_reviews, sync_menu_catalog
+            # FIX: was `from seed import ...` — must be `from backend.seed import ...`
+            from backend.seed import seed_sample_reviews, sync_menu_catalog
             sync_menu_catalog(app)
             seed_sample_reviews()
         except Exception as seed_error:
@@ -509,7 +513,6 @@ try:
             {'name': 'Fresh Lime Tea', 'price': 15, 'category': 'Tea & Coffee', 'is_veg': True, 'prep_time': 3, 'rating': 4.5},
             {'name': 'Black Tea', 'price': 15, 'category': 'Tea & Coffee', 'is_veg': True, 'prep_time': 3, 'rating': 4.3},
             {'name': 'Black Coffee', 'price': 15, 'category': 'Tea & Coffee', 'is_veg': True, 'prep_time': 3, 'rating': 4.4},
-            # amazonq-ignore-next-line
             {'name': 'Ginger Tea', 'price': 17, 'category': 'Tea & Coffee', 'is_veg': True, 'prep_time': 3, 'rating': 4.4},
             {'name': 'Ginger Coffee', 'price': 17, 'category': 'Tea & Coffee', 'is_veg': True, 'prep_time': 3, 'rating': 4.4},
             {'name': 'Hot Badam Milk', 'price': 17, 'category': 'Tea & Coffee', 'is_veg': True, 'prep_time': 5, 'rating': 4.5},
@@ -528,7 +531,7 @@ try:
             {'name': 'Ganga Jamuna', 'price': 40, 'category': 'Fresh Juices', 'is_veg': True, 'prep_time': 5, 'rating': 4.5},
             {'name': 'Mix Fruit Juice', 'price': 50, 'category': 'Fresh Juices', 'is_veg': True, 'prep_time': 5, 'rating': 4.6},
             
-            # COLD DRINKS - COCA COLA
+            # COLD DRINKS
             {'name': 'Coke', 'price': 20, 'category': 'Cold Drinks', 'is_veg': True, 'prep_time': 2, 'rating': 4.3},
             {'name': 'Sprite', 'price': 20, 'category': 'Cold Drinks', 'is_veg': True, 'prep_time': 2, 'rating': 4.4},
             {'name': 'Fanta', 'price': 20, 'category': 'Cold Drinks', 'is_veg': True, 'prep_time': 2, 'rating': 4.3},
@@ -569,7 +572,7 @@ try:
             {'name': 'Tropicana Mango', 'price': 20, 'category': 'Tropicana', 'is_veg': True, 'prep_time': 2, 'rating': 4.5},
             {'name': 'Tropicana Pomegranate', 'price': 20, 'category': 'Tropicana', 'is_veg': True, 'prep_time': 2, 'rating': 4.4},
             
-            # CHIA & OTHER
+            # OTHER DRINKS
             {'name': 'Chia - Lemon', 'price': 15, 'category': 'Other Drinks', 'is_veg': True, 'prep_time': 5, 'rating': 4.4},
             {'name': 'Chia - Blueberry', 'price': 15, 'category': 'Other Drinks', 'is_veg': True, 'prep_time': 5, 'rating': 4.4},
             {'name': 'Chia - Orange', 'price': 15, 'category': 'Other Drinks', 'is_veg': True, 'prep_time': 5, 'rating': 4.4},
