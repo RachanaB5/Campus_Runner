@@ -1154,22 +1154,12 @@ Note: exact response fields can vary by endpoint evolution; use these examples a
 ---
 
 ## 23. Demo and Screenshots
+<img width="1600" height="1291" alt="image" src="https://github.com/user-attachments/assets/1cb156fe-2826-4e77-ba08-1fb584df4b6a" />
 
-Use this section to showcase the product visually in your GitHub repo.
 
-### 23.1 Suggested Screenshot Set
 
-- Login and OTP verification screen
-- Home/menu browsing screen
-- Cart and checkout screen
-- Payment flow screen
-- Order tracking timeline screen
-- Runner mode order board
-- Runner active delivery screen
-- Rewards dashboard
-- Admin dashboard and order management screen
 
-### 23.2 Repository Folder Convention
+### 23.3 Repository Folder Convention
 
 Store media under:
 
