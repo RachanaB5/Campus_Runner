@@ -24,7 +24,7 @@ services:
       - key: MAIL_USE_TLS
         value: "True"
       - key: CORS_ORIGINS
-        value: https://campus-runner-frontend.onrender.com
+        value: https://campus-runner-gbmut5rt4-rachanab5s-projects.vercel.app
       # Set MAIL_USERNAME and MAIL_PASSWORD manually in Render dashboard
 
   - type: static
@@ -35,4 +35,4 @@ services:
     publishPath: dist
     envVars:
       - key: VITE_API_BASE_URL
-        value: https://campus-runner-backend.onrender.com/api
+        value: https://campus-runner-2w67.onrender.com/api
