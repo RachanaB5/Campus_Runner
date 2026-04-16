@@ -44,7 +44,10 @@ CampusRunner supports the complete lifecycle:
 - [18. Troubleshooting Guide](#18-troubleshooting-guide)
 - [19. Agile Delivery Notes](#19-agile-delivery-notes)
 - [20. Contributing](#20-contributing)
-- [21. License](#21-license)
+- [21. Order and Runner Lifecycle Sequence Diagrams](#21-order-and-runner-lifecycle-sequence-diagrams)
+- [22. API Request and Response Examples](#22-api-request-and-response-examples)
+- [23. Demo and Screenshots](#23-demo-and-screenshots)
+- [24. License](#24-license)
 
 ---
 
@@ -923,6 +926,285 @@ cd backend && pytest
 
 ---
 
-## 21. License
+## 21. Order and Runner Lifecycle Sequence Diagrams
+
+### 21.1 Customer Order Lifecycle
+
+```mermaid
+sequenceDiagram
+    participant C as Customer
+    participant FE as Frontend
+    participant API as Flask API
+    participant DB as SQLite DB
+    participant PAY as Payment Service
+    participant N as Notification Service
+
+    C->>FE: Add items and checkout
+    FE->>API: POST /api/checkout/validate
+    API->>DB: Validate cart, prices, stock
+    DB-->>API: Validation result
+    API-->>FE: Validation OK
+
+    FE->>API: POST /api/checkout/confirm
+    API->>DB: Create order + order items + delivery row
+    DB-->>API: Order persisted (status: pending/confirmed)
+
+    alt UPI or Card
+        FE->>API: POST /api/payment/initiate
+        API->>PAY: Create payment intent/order
+        PAY-->>API: Payment metadata
+        API-->>FE: Payment payload
+        FE->>API: POST /api/payment/verify
+        API->>DB: Mark payment success
+    else COD
+        FE->>API: POST /api/payment/initiate (cod)
+        API->>DB: Mark payment as cod_pending
+    end
+
+    API->>N: Trigger runner notifications
+    N-->>FE: Real-time update via Socket.IO
+    FE-->>C: Show order tracking timeline
+```
+
+### 21.2 Runner Delivery Lifecycle
+
+```mermaid
+sequenceDiagram
+    participant R as Runner
+    participant FE as Runner UI
+    participant API as Flask API
+    participant DB as SQLite DB
+    participant C as Customer UI
+
+    R->>FE: Go online
+    FE->>API: PUT /api/runner/toggle
+    API->>DB: Set runner is_available=true, status=online
+    DB-->>API: Updated runner profile
+
+    FE->>API: GET /api/runner/available-orders
+    API->>DB: Query claimable orders
+    DB-->>API: Available list
+    API-->>FE: Show available orders
+
+    R->>FE: Accept order
+    FE->>API: POST /api/runner/accept/<order_id>
+    API->>DB: Assign delivery + lock ownership
+    DB-->>API: Assignment saved
+    API-->>C: Emit order_status_update (runner assigned)
+
+    R->>FE: Pick up order
+    FE->>API: POST /api/runner/pickup-order/<order_id>
+    API->>DB: Set picked_up status + timestamps
+
+    R->>FE: Mark in transit
+    FE->>API: POST /api/runner/mark-in-transit/<order_id>
+    API->>DB: Set in_transit status
+
+    R->>FE: Confirm delivery with OTP
+    FE->>API: POST /api/runner/confirm-delivery/<order_id>
+    API->>DB: Verify OTP + mark delivered + reward points
+    DB-->>API: Delivery completed
+    API-->>C: Emit delivered status update
+```
+
+---
+
+## 22. API Request and Response Examples
+
+### 22.1 Register User
+
+Request:
+
+```http
+POST /api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Aarav Sharma",
+  "email": "aarav@rvu.edu.in",
+  "phone": "9876543210",
+  "password": "securePass123"
+}
+```
+
+Response (201):
+
+```json
+{
+  "message": "User registered successfully. Check your email for the verification code.",
+  "requires_verification": true,
+  "email_sent": true,
+  "user": {
+    "id": "uuid",
+    "name": "Aarav Sharma",
+    "email": "aarav@rvu.edu.in",
+    "role": "customer"
+  }
+}
+```
+
+### 22.2 Login
+
+Request:
+
+```http
+POST /api/auth/login
+Content-Type: application/json
+
+{
+  "email": "aarav@rvu.edu.in",
+  "password": "securePass123"
+}
+```
+
+Response (200):
+
+```json
+{
+  "message": "Login successful",
+  "access_token": "jwt-token",
+  "user": {
+    "id": "uuid",
+    "email": "aarav@rvu.edu.in",
+    "role": "customer"
+  }
+}
+```
+
+### 22.3 Checkout Confirm
+
+Request:
+
+```http
+POST /api/checkout/confirm
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "delivery_address": "Hostel A, Room 101, Near Block A",
+  "customer_phone": "9876543210",
+  "payment_method": "upi"
+}
+```
+
+Response (201/200):
+
+```json
+{
+  "message": "Order created successfully",
+  "order": {
+    "id": "order-uuid",
+    "order_number": "ORD-20260416-ABCD",
+    "status": "pending",
+    "total_amount": 210.0
+  }
+}
+```
+
+### 22.4 Initiate UPI Payment
+
+Request:
+
+```http
+POST /api/payment/initiate
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "order_id": "order-uuid",
+  "method": "upi",
+  "upi_id": "user@upi"
+}
+```
+
+Response (200):
+
+```json
+{
+  "success": true,
+  "method": "upi",
+  "razorpay_order_id": "order_mock_xxx",
+  "razorpay_key_id": "rzp_test_xxx",
+  "mock_checkout": true
+}
+```
+
+### 22.5 Runner Accept Order
+
+Request:
+
+```http
+POST /api/runner/accept/<order_id>
+Authorization: Bearer <runner-token>
+```
+
+Response (200):
+
+```json
+{
+  "message": "Order accepted successfully",
+  "delivery": {
+    "status": "assigned"
+  }
+}
+```
+
+Note: exact response fields can vary by endpoint evolution; use these examples as integration templates.
+
+---
+
+## 23. Demo and Screenshots
+
+Use this section to showcase the product visually in your GitHub repo.
+
+### 23.1 Suggested Screenshot Set
+
+- Login and OTP verification screen
+- Home/menu browsing screen
+- Cart and checkout screen
+- Payment flow screen
+- Order tracking timeline screen
+- Runner mode order board
+- Runner active delivery screen
+- Rewards dashboard
+- Admin dashboard and order management screen
+
+### 23.2 Repository Folder Convention
+
+Store media under:
+
+```text
+docs/screenshots/
+docs/demo/
+```
+
+Suggested filenames:
+
+- `docs/screenshots/login.png`
+- `docs/screenshots/menu.png`
+- `docs/screenshots/checkout.png`
+- `docs/screenshots/order-tracking.png`
+- `docs/screenshots/runner-mode.png`
+- `docs/screenshots/admin-dashboard.png`
+- `docs/demo/campusrunner-walkthrough.gif`
+
+### 23.3 README Embed Template
+
+```md
+## Product Screens
+
+![Login](docs/screenshots/login.png)
+![Menu](docs/screenshots/menu.png)
+![Checkout](docs/screenshots/checkout.png)
+![Order Tracking](docs/screenshots/order-tracking.png)
+
+## Demo
+
+![CampusRunner Demo](docs/demo/campusrunner-walkthrough.gif)
+```
+
+---
+
+## 24. License
 
 MIT
