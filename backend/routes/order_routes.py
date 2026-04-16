@@ -1,9 +1,9 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, Order, OrderItem, User, Food, Delivery, Payment, RewardPoints, RewardTransaction, Review, OrderOTP, Runner
+from backend.models import db, Order, OrderItem, User, Food, Delivery, Payment, RewardPoints, RewardTransaction, Review, OrderOTP, Runner
 from datetime import datetime, timedelta
-from utils import send_runner_otp_notification
-from services.payment_service import issue_refund
+from backend.utils import send_runner_otp_notification
+from backend.services.payment_service import issue_refund
 import uuid
 
 order_bp = Blueprint('order', __name__)
@@ -17,7 +17,7 @@ def generate_order_number():
 
 def get_available_runner():
     """Find an available runner for delivery"""
-    from models import Runner
+    from backend.models import Runner
     runner = Runner.query.filter_by(is_available=True, status='online').first()
     return runner
 

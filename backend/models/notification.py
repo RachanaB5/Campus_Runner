@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from models import db
+from . import db
 
 
 class Notification(db.Model):

@@ -1,4 +1,4 @@
-from models import db
+from . import db
 from datetime import datetime
 import uuid
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 import uuid
 
-from models import db, Notification, Order, Runner, User
+from backend.models import db, Notification, Order, Runner, User
 
 
 def calculate_runner_reward(order_total: float) -> int:

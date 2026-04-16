@@ -4,8 +4,8 @@ import uuid
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
-from models import db, SavedPaymentMethod
-from services.payment_service import hash_card_number, is_valid_luhn, normalize_card_number, validate_card_expiry
+from backend.models import db, SavedPaymentMethod
+from backend.services.payment_service import hash_card_number, is_valid_luhn, normalize_card_number, validate_card_expiry
 
 payment_methods_bp = Blueprint('payment_methods', __name__)
 

@@ -2,19 +2,19 @@ from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
 
-from models.user import User
-from models.food import Food
-from models.order import Order, OrderItem
-from models.delivery import Delivery
-from models.runner import Runner
-from models.reward_points import RewardPoints, RewardTransaction
-from models.token import Token
-from models.cart import Cart, CartItem
-from models.checkout import Checkout
-from models.otp import OrderOTP
-from models.payment import Payment
-from models.saved_payment_method import SavedPaymentMethod
-from models.notification import Notification
-from models.review import Review
+from .user import User
+from .food import Food
+from .order import Order, OrderItem
+from .delivery import Delivery
+from .runner import Runner
+from .reward_points import RewardPoints, RewardTransaction
+from .token import Token
+from .cart import Cart, CartItem
+from .checkout import Checkout
+from .otp import OrderOTP
+from .payment import Payment
+from .saved_payment_method import SavedPaymentMethod
+from .notification import Notification
+from .review import Review
 
 __all__ = ['db', 'User', 'Food', 'Order', 'OrderItem', 'Delivery', 'Runner', 'RewardPoints', 'RewardTransaction', 'Token', 'Cart', 'CartItem', 'Checkout', 'OrderOTP', 'Payment', 'SavedPaymentMethod', 'Notification', 'Review']

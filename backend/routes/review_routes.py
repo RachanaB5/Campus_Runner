@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 import uuid
 
-from models import db, Food, Review, Order, OrderItem
+from backend.models import db, Food, Review, Order, OrderItem
 
 review_bp = Blueprint('review', __name__)
 

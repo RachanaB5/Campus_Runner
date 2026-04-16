@@ -1,8 +1,8 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, Checkout, Order, OrderItem, User, Food, Delivery, RewardPoints, RewardTransaction
+from backend.models import db, Checkout, Order, OrderItem, User, Food, Delivery, RewardPoints, RewardTransaction
 from datetime import datetime, timedelta
-from utils import send_order_confirmation_email
+from backend.utils import send_order_confirmation_email
 import uuid
 import re
 

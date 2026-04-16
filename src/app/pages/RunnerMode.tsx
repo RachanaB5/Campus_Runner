@@ -195,14 +195,14 @@ export function RunnerMode() {
     socket.on("order_taken", handleOrderTaken);
 
     if (runner.isAvailable) {
-      socket.emit("runner_go_online", { token: localStorage.getItem("access_token") });
+      socket.emit("runner_go_online");
     }
 
     return () => {
       socket.off("new_order_available", handleNewOrder);
       socket.off("order_taken", handleOrderTaken);
       if (runner.isAvailable) {
-        socket.emit("runner_go_offline", { token: localStorage.getItem("access_token") });
+        socket.emit("runner_go_offline");
       }
     };
   }, [isLoggedIn, runner.isAvailable, socket]);

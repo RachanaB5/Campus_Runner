@@ -4,7 +4,7 @@ import uuid
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
-from models import Order, RewardPoints, RewardTransaction, User, db
+from backend.models import Order, RewardPoints, RewardTransaction, User, db
 
 rewards_bp = Blueprint('rewards', __name__)
 

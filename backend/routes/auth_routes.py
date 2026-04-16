@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, has_request_context, current_app
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
-from models import db, User, RewardPoints, Order, Runner
+from backend.models import db, User, RewardPoints, Order, Runner
 import uuid
 from datetime import datetime, timedelta
 import re
@@ -38,7 +38,7 @@ def _dev_mode_expose_otp():
 def dispatch_otp_email(to_email, otp, purpose):
     """Send OTP synchronously so SMTP errors are visible. Returns (sent, error_or_none)."""
     from app import app
-    from utils import build_otp_email_html, send_otp_email_sync
+    from backend.utils import build_otp_email_html, send_otp_email_sync
 
     html = build_otp_email_html(otp, purpose)
     subject = {

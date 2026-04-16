@@ -1,11 +1,11 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, User, Runner, Delivery, Order, OrderOTP, RewardPoints, RewardTransaction
+from backend.models import db, User, Runner, Delivery, Order, OrderOTP, RewardPoints, RewardTransaction
 from datetime import datetime
 import uuid
 from sqlalchemy import select
 
-from services.notification_service import notify_order_taken
+from backend.services.notification_service import notify_order_taken
 
 runner_bp = Blueprint('runner', __name__)
 

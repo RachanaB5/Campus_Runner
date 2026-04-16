@@ -7,8 +7,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from models import db
-from models import Food, Review, User
+from backend.models import db, Food, Review, User
 import uuid
 from datetime import datetime, timedelta
 
@@ -171,7 +170,7 @@ MENU_ITEMS = [
     {"name": "Veg Roll", "category": "Rolls", "price": 70,
      "description": "Spiced vegetables wrapped in a crispy paratha roll",
      "is_veg": True, "prep_time": 10,
-     "image_url": "https://images.unsplash.com/photo-1626700051175-6818013e1d4f?w=400&h=300&fit=crop"},
+     "image_url": "https://wbcdn.in/assets/img/uploads/cache/mywb/uploads/img_7da6ad49d67349e5fe81ba0df42255eaf7cdb929_870_.jpg"},
     {"name": "Veg Roll with Cheese", "category": "Rolls", "price": 80,
      "description": "Spiced vegetables, cheese and sauces wrapped in a crispy paratha roll",
      "is_veg": True, "prep_time": 10,
@@ -179,19 +178,19 @@ MENU_ITEMS = [
     {"name": "Paneer Roll", "category": "Rolls", "price": 90,
      "description": "Grilled paneer with onion and chutney in a paratha wrap",
      "is_veg": True, "prep_time": 10,
-     "image_url": "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400&h=300&fit=crop"},
+     "image_url": "https://food.ndtv.com/recipe-instant-masala-paneer-roll-958181"},
     {"name": "Paneer Roll with Cheese", "category": "Rolls", "price": 100,
      "description": "Grilled paneer, melty cheese and chutney in a paratha wrap",
      "is_veg": True, "prep_time": 10,
-     "image_url": "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400&h=300&fit=crop"},
+     "image_url": "https://instamart-media-assets.swiggy.com/swiggy/image/upload/fl_lossy,f_auto,q_auto,h_960,w_960//InstamartAssets/Receipes/potato_paneer_cheese_roll.webp"},
     {"name": "Egg Roll", "category": "Rolls", "price": 70,
      "description": "Egg omelette with masala and onion in a paratha roll",
      "is_veg": False, "prep_time": 10,
-     "image_url": "https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=400&h=300&fit=crop"},
+     "image_url": "https://dinnersdishesanddesserts.com/wp-content/uploads/2021/12/Vietnamese-Egg-Rolls-square-scaled.jpg"},
     {"name": "Egg Roll with Cheese", "category": "Rolls", "price": 80,
      "description": "Egg omelette, melted cheese and onion in a paratha roll",
      "is_veg": False, "prep_time": 10,
-     "image_url": "https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=400&h=300&fit=crop"},
+     "image_url": "https://dinnersdishesanddesserts.com/wp-content/uploads/2021/12/Vietnamese-Egg-Rolls-square-scaled.jpg"},
     {"name": "Chicken Roll", "category": "Rolls", "price": 100,
      "description": "Juicy chicken tikka pieces wrapped in a soft paratha",
      "is_veg": False, "prep_time": 15,

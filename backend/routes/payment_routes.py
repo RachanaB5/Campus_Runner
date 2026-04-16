@@ -5,9 +5,9 @@ import uuid
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
-from models import db, Order, Payment, User, SavedPaymentMethod
-from services.notification_service import notify_runners_new_order
-from services.payment_service import (
+from backend.models import db, Order, Payment, User, SavedPaymentMethod
+from backend.services.notification_service import notify_runners_new_order
+from backend.services.payment_service import (
     hash_card_number,
     is_valid_luhn,
     normalize_card_number,

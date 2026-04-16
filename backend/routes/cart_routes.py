@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, Food, User
-from models.cart import Cart, CartItem
+from backend.models import db, Food, User
+from backend.models.cart import Cart, CartItem
 import uuid
 
 cart_bp = Blueprint('cart', __name__)

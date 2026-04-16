@@ -30,38 +30,6 @@ export interface Reward {
   category: string;
 }
 
-export interface MenuItem {
-  id: number;
-  name: string;
-  description: string;
-  price: number;
-  image: string;
-  category: string;
-  isVeg: boolean;
-  rating: number;
-  prepTime: string;
-}
-
-export interface Order {
-  id: string;
-  items: { item: MenuItem; quantity: number }[];
-  total: number;
-  status: 'pending' | 'preparing' | 'ready' | 'delivered';
-  timestamp: Date;
-  deliveryLocation: string;
-  customerName: string;
-  points?: number;
-}
-
-export interface Reward {
-  id: number;
-  name: string;
-  description: string;
-  pointsRequired: number;
-  image: string;
-  category: string;
-}
-
 export const menuItems: MenuItem[] = [
   // ── MEALS ──────────────────────────────────────────────────────────
   {
@@ -727,7 +695,6 @@ export const menuItems: MenuItem[] = [
   {
     id: 59,
     name: "Gulab Jamun",
-    // amazonq-ignore-next-line
     description: "Soft spongy balls in sugar syrup",
     price: 70,
     image: "https://images.unsplash.com/photo-1551632840-3b83ce93e72b?w=400&h=300&fit=crop",

@@ -4,7 +4,7 @@ from flask import request
 from flask_jwt_extended import decode_token
 from flask_socketio import join_room, leave_room
 
-from models import db, Runner
+from backend.models import db, Runner
 
 
 def _get_socket_user_id() -> str | None:
